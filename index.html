@@ -3,327 +3,1278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 脚本转视频引擎引擎</title>
+    <title>全能 AI 视频合成工作站 (Pexels + 拖拽文本 + 混流引擎)</title>
     <style>
         :root {
-            --bg-color: #1e1e24;
-            --panel-bg: #2b2b36;
-            --primary: #6c5ce7;
-            --text: #f5f6fa;
+            --bg: #0a0615;
+            --bg-soft: #140b2a;
+            --panel: rgba(19, 12, 36, 0.84);
+            --panel-border: rgba(129, 75, 255, 0.34);
+            --panel-hover: rgba(146, 95, 255, 0.5);
+            --text: #ece8ff;
+            --text-soft: #b9afd6;
+            --primary: #8b35ff;
+            --primary-strong: #a44bff;
+            --accent: #18d9c7;
+            --danger: #ff4f8b;
+            --success: #2fd487;
+            --shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+            --grid-gap: 14px;
         }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            height: 100vh;
+
+        * {
             box-sizing: border-box;
-            gap: 20px;
         }
-        /* 左侧脚本编辑区 */
-        .editor-panel {
-            flex: 1;
-            background: var(--panel-bg);
-            border-radius: 12px;
-            padding: 20px;
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Rajdhani", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            background:
+                radial-gradient(1200px 600px at 15% -15%, rgba(168, 64, 255, 0.18), transparent 55%),
+                radial-gradient(1000px 700px at 100% 10%, rgba(24, 217, 199, 0.12), transparent 48%),
+                linear-gradient(145deg, #090512 0%, #0d0720 46%, #090512 100%);
             display: flex;
             flex-direction: column;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
         }
-        textarea {
+
+        .studio-topbar {
+            height: 62px;
+            padding: 10px 18px;
+            border-bottom: 1px solid rgba(128, 70, 255, 0.28);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(12, 7, 24, 0.88);
+            backdrop-filter: blur(8px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: 0.4px;
+        }
+
+        .brand-badge {
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            background: linear-gradient(135deg, #7e34ff, #bb3fff);
+            box-shadow: 0 0 16px rgba(156, 64, 255, 0.58);
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .brand small {
+            color: var(--text-soft);
+            font-size: 13px;
+            margin-left: 8px;
+        }
+
+        .top-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-soft);
+            font-size: 13px;
+        }
+
+        .status-pill {
+            padding: 5px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(83, 215, 168, 0.45);
+            color: #8fffd4;
+            background: rgba(14, 57, 48, 0.42);
+        }
+
+        .app-grid {
             flex: 1;
-            background: #1a1a20;
-            color: #a4b0be;
-            border: 1px solid #4b4b5c;
-            border-radius: 8px;
-            padding: 15px;
-            font-size: 14px;
-            resize: none;
-            line-height: 1.6;
-            outline: none;
+            min-height: 0;
+            padding: var(--grid-gap);
+            display: grid;
+            grid-template-columns: 320px minmax(360px, 1fr) 450px;
+            gap: var(--grid-gap);
+            overflow: hidden;
         }
-        .btn-group {
-            margin-top: 15px;
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            padding: 14px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .panel:hover {
+            border-color: var(--panel-hover);
+        }
+
+        h2,
+        h3 {
+            margin: 0;
+            font-size: 15px;
+            letter-spacing: 0.4px;
+            color: #fff;
+            border-bottom: 1px solid rgba(102, 64, 188, 0.5);
+            padding-bottom: 9px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 12px;
+            color: var(--text-soft);
+        }
+
+        .row {
             display: flex;
             gap: 10px;
         }
-        button {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: 0.3s;
+
+        .row > .ctrl-group,
+        .row > div {
             flex: 1;
         }
-        button:hover { background: #5f27cd; }
-        button:disabled { background: #576574; cursor: not-allowed; }
 
-        /* 右侧播放与时间轴区 */
-        .player-panel {
-            flex: 1;
+        input,
+        select,
+        textarea {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid rgba(111, 79, 196, 0.66);
+            background: rgba(9, 6, 19, 0.93);
+            color: #f3f1ff;
+            padding: 9px 10px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: rgba(164, 78, 255, 0.95);
+            box-shadow: 0 0 0 2px rgba(139, 53, 255, 0.22);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 58px;
+        }
+
+        input[type="color"] {
+            padding: 3px;
+            height: 38px;
+        }
+
+        button {
+            border: none;
+            border-radius: 9px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.15s, filter 0.15s, opacity 0.15s;
+            background: linear-gradient(135deg, #6728dd, #8f34ff);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .btn-green {
+            background: linear-gradient(135deg, #08b99b, #11d48b);
+        }
+
+        .btn-red {
+            background: linear-gradient(135deg, #e53f7f, #ff5d66);
+        }
+
+        .scene-card {
+            background: linear-gradient(170deg, rgba(38, 21, 73, 0.92), rgba(23, 14, 45, 0.93));
+            border: 1px solid rgba(130, 86, 214, 0.48);
+            border-left: 3px solid var(--primary);
+            border-radius: 10px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 8px;
+            animation: cardIn 0.24s ease;
         }
-        .video-container {
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            background: #000;
-            border-radius: 12px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+
+        @keyframes cardIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .scene-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #c9b3ff;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .scene-remove {
+            background: transparent;
+            border: 1px solid rgba(255, 102, 162, 0.5);
+            color: #ff8bb6;
+            padding: 3px 8px;
+            border-radius: 7px;
+            font-size: 12px;
+        }
+
+        .workspace {
+            flex: 1;
+            min-height: 260px;
             display: flex;
             align-items: center;
             justify-content: center;
+            border-radius: 10px;
+            background:
+                radial-gradient(500px 240px at 70% 10%, rgba(132, 49, 255, 0.14), transparent 60%),
+                #05070f;
+            border: 1px solid rgba(99, 64, 184, 0.62);
+            overflow: hidden;
+            padding: 10px;
         }
-        #videoImage {
+
+        .preview-box {
+            position: relative;
+            width: 100%;
+            max-height: 100%;
+            aspect-ratio: 16/9;
+            border-radius: 10px;
+            background: #0f1222;
+            overflow: hidden;
+            box-shadow: inset 0 0 0 1px rgba(143, 88, 255, 0.28), 0 16px 40px rgba(1, 0, 5, 0.6);
+        }
+
+        .preview-media {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: opacity 0.5s;
+            display: none;
         }
-        #videoCaption {
-            position: absolute;
-            bottom: 20px;
-            width: 80%;
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8), -2px -2px 4px rgba(0,0,0,0.8);
-            background: rgba(0,0,0,0.4);
-            padding: 10px;
-            border-radius: 8px;
-        }
-        .status-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            z-index: 10;
-        }
-        .hidden { display: none !important; }
 
-        /* 时间轴 */
-        .timeline {
-            background: var(--panel-bg);
-            border-radius: 12px;
-            padding: 20px;
-            flex: 1;
-            overflow-y: auto;
+        #textLayer {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
         }
-        .scene-item {
-            background: #353b48;
-            padding: 10px;
-            margin-bottom: 10px;
+
+        #mainSubtitle {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            text-align: center;
+            color: #fff;
+            font-size: 24px;
+            font-weight: 700;
+            text-shadow: 0 3px 10px rgba(0, 0, 0, 0.75);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .draggable-text {
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+            white-space: nowrap;
+            padding: 4px 6px;
+            border: 1px dashed transparent;
             border-radius: 6px;
-            border-left: 4px solid transparent;
-            font-size: 13px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-weight: 700;
+            touch-action: none;
+            transition: border-color 0.12s, background 0.12s;
         }
-        .scene-item.active {
-            border-left-color: var(--primary);
-            background: #2f3640;
+
+        .draggable-text:hover {
+            border-color: rgba(219, 196, 255, 0.75);
+        }
+
+        .draggable-text.active {
+            border-color: #9a57ff;
+            background: rgba(134, 58, 255, 0.25);
+        }
+
+        .toolbar-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-log {
+            font-size: 12px;
+            text-align: center;
+            color: #a6f2d2;
+            border-top: 1px solid rgba(108, 72, 199, 0.48);
+            padding-top: 8px;
+            min-height: 20px;
+        }
+
+        .text-inspector {
+            border: 1px solid rgba(107, 70, 199, 0.55);
+            border-radius: 10px;
+            padding: 10px;
+            background: rgba(12, 7, 24, 0.66);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .inspector-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #d8c9ff;
+        }
+
+        #scenesContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            padding-right: 3px;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        @media (max-width: 1300px) {
+            .app-grid {
+                grid-template-columns: 300px 1fr;
+                grid-template-areas:
+                    "left right"
+                    "middle right";
+            }
+
+            .left-panel { grid-area: left; }
+            .middle-panel { grid-area: middle; }
+            .right-panel { grid-area: right; }
+        }
+
+        @media (max-width: 980px) {
+            body {
+                overflow: auto;
+            }
+
+            .studio-topbar {
+                flex-wrap: wrap;
+                height: auto;
+                gap: 8px;
+            }
+
+            .app-grid {
+                height: auto;
+                min-height: auto;
+                grid-template-columns: 1fr;
+                grid-template-areas: none;
+                overflow: visible;
+            }
+
+            .panel {
+                overflow: visible;
+            }
+
+            .workspace {
+                min-height: 220px;
+            }
         }
     </style>
 </head>
 <body>
+    <header class="studio-topbar">
+        <div class="brand">
+            <div class="brand-badge">AI</div>
+            <div>
+                <h1>AI Studio</h1>
+                <small>全能视频合成工作站</small>
+            </div>
+        </div>
+        <div class="top-right">
+            <span id="sceneCounter">场景: 1</span>
+            <span class="status-pill">状态: 待命</span>
+        </div>
+    </header>
 
-    <!-- 左侧：脚本输入 -->
-    <div class="editor-panel">
-        <h2>📝 视频脚本</h2>
-        <p style="font-size: 12px; color: #7f8fa6;">请按格式输入脚本，工具将自动解析画面与配音。</p>
-        <textarea id="scriptInput">场景1：
-画面：一个赛博朋克风格的未来城市，霓虹灯闪烁，下着大雨，电影质感。
-旁白：在2077年的不夜城，雨水洗刷着金属的街道。
+    <div class="app-grid">
+        <div class="panel left-panel">
+            <h2>全局设置 & API</h2>
 
-场景2：
-画面：一个机器人背影，站在摩天大楼天台边缘，俯瞰城市。
-旁白：它们被制造出来，却在寻找属于自己的灵魂。
+            <div class="ctrl-group">
+                <label style="color:var(--accent)">Pexels API Key (必填)</label>
+                <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
+            </div>
 
-场景3：
-画面：镜头特写，机器人的眼睛亮起蓝色的光芒。
-旁白：觉醒，往往只在一瞬间。</textarea>
-        <div class="btn-group">
-            <button id="parseBtn">解析并生成资产</button>
-            <button id="playBtn" disabled>▶ 开始播放视频</button>
+            <div class="ctrl-group">
+                <label>视频导出尺寸</label>
+                <select id="videoSize" onchange="updatePreviewRatio()">
+                    <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
+                    <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
+                    <option value="1080,1080">1:1 正方形 (1080x1080)</option>
+                    <option value="1200,900">4:3 传统横屏 (1200x900)</option>
+                    <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
+                </select>
+            </div>
+
+            <div class="ctrl-group">
+                <label>全局背景音乐 (BGM)</label>
+                <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*">
+                <label>音量调节: <span id="bgmVolVal">15%</span></label>
+                <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
+            </div>
+
+            <h2>主字幕样式 (底部旁白)</h2>
+            <div class="ctrl-group">
+                <label>字体库</label>
+                <select id="fontFamily">
+                    <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                    <option value="SimHei, sans-serif">黑体</option>
+                    <option value="KaiTi, serif">楷体</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="ctrl-group">
+                    <label>字号大小</label>
+                    <input type="number" id="fontSize" value="55" min="16" max="150">
+                </div>
+                <div class="ctrl-group">
+                    <label>字体颜色</label>
+                    <input type="color" id="fontColor" value="#ffffff">
+                </div>
+            </div>
+        </div>
+
+        <div class="panel middle-panel">
+            <h2>
+                场景编排轨道
+                <button onclick="addScene()" class="btn-green" style="padding:6px 10px;">+ 添加场景</button>
+            </h2>
+            <div id="scenesContainer"></div>
+        </div>
+
+        <div class="panel right-panel">
+            <h2>
+                可视化监视器
+                <div style="display:flex; gap:6px;">
+                    <button onclick="addTextBox()" style="padding:6px 10px;">+ 自由文本</button>
+                    <button onclick="deleteActiveTextBox()" class="btn-red" style="padding:6px 10px;">删文本</button>
+                </div>
+            </h2>
+
+            <div class="workspace">
+                <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
+                    <video id="mediaPlayer" class="preview-media" muted crossOrigin="anonymous" playsinline></video>
+                    <div id="mainSubtitle"></div>
+                    <div id="textLayer"></div>
+                </div>
+            </div>
+
+            <div class="text-inspector">
+                <div class="inspector-title">自由文本属性 (选中后可编辑)</div>
+                <div class="ctrl-group">
+                    <label>内容</label>
+                    <input id="textEditContent" type="text" placeholder="先在预览区点击一个文本" disabled>
+                </div>
+                <div class="row">
+                    <div class="ctrl-group">
+                        <label>颜色</label>
+                        <input id="textEditColor" type="color" value="#ffffff" disabled>
+                    </div>
+                    <div class="ctrl-group">
+                        <label>字号</label>
+                        <input id="textEditSize" type="number" value="24" min="12" max="200" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-row">
+                <button id="generateBtn" class="btn-green" style="height:42px;">第一步: 解析场景资产 (获取视频/配音)</button>
+                <div style="display:flex; gap:10px;">
+                    <button id="playRecordBtn" class="btn-red" style="flex:1; height:42px;" disabled>第二步: 播放并录制</button>
+                    <button id="downloadBtn" style="flex:1; height:42px;" disabled>第三步: 下载完整视频</button>
+                </div>
+                <div id="statusLog" class="status-log">等待操作...</div>
+            </div>
         </div>
     </div>
 
-    <!-- 右侧：播放器与时间轴 -->
-    <div class="player-panel">
-        <div class="video-container">
-            <div id="statusOverlay" class="status-overlay">等待解析脚本...</div>
-            <img id="videoImage" src="" class="hidden">
-            <div id="videoCaption" class="hidden"></div>
-        </div>
-        
-        <div class="timeline" id="timeline">
-            <h3 style="margin-top:0;">⏱ 时间轴 (解析结果)</h3>
-            <div id="sceneList" style="color:#7f8fa6; font-size:14px;">暂无场景</div>
-        </div>
-    </div>
+    <canvas id="renderCanvas" width="1920" height="1080"></canvas>
 
     <script>
-        let parsedScenes = [];
-        let currentSceneIndex = 0;
-        let isPlaying = false;
-        
-        // DOM 元素
-        const scriptInput = document.getElementById('scriptInput');
-        const parseBtn = document.getElementById('parseBtn');
-        const playBtn = document.getElementById('playBtn');
-        const statusOverlay = document.getElementById('statusOverlay');
-        const videoImage = document.getElementById('videoImage');
-        const videoCaption = document.getElementById('videoCaption');
-        const sceneList = document.getElementById('sceneList');
+        const pexelsInput = document.getElementById('pexelsKey');
+        if (localStorage.getItem('pexels_key')) pexelsInput.value = localStorage.getItem('pexels_key');
+        function saveKey() { localStorage.setItem('pexels_key', pexelsInput.value.trim()); }
 
-        // 第一步：解析脚本
-        parseBtn.addEventListener('click', async () => {
-            const text = scriptInput.value;
-            parsedScenes = parseScript(text);
-            
-            if (parsedScenes.length === 0) {
-                alert("未解析到场景，请检查格式！格式需包含“画面：”和“旁白：”");
+        function updatePreviewRatio() {
+            const [w, h] = document.getElementById('videoSize').value.split(',').map(Number);
+            document.getElementById('previewBox').style.aspectRatio = `${w} / ${h}`;
+            repositionTextBoxes();
+        }
+
+        let sceneCount = 0;
+        let activeTextBox = null;
+
+        const Engine = {
+            scenes: [],
+            textBoxes: [],
+            audioCtx: null,
+            bgmBuffer: null,
+            isPlaying: false,
+            currentIdx: 0,
+            mediaRecorder: null,
+            recordedChunks: [],
+            animFrame: null,
+            activeVoice: null,
+            sceneTimer: null,
+            objectUrls: [],
+            dragState: { box: null, startX: 0, startY: 0, startL: 0, startT: 0 }
+        };
+
+        const DOM = {
+            log: document.getElementById('statusLog'),
+            canvas: document.getElementById('renderCanvas'),
+            ctx: document.getElementById('renderCanvas').getContext('2d'),
+            player: document.getElementById('mediaPlayer'),
+            subtitle: document.getElementById('mainSubtitle'),
+            preview: document.getElementById('previewBox'),
+            textLayer: document.getElementById('textLayer'),
+            sceneCounter: document.getElementById('sceneCounter'),
+            statusPill: document.querySelector('.status-pill'),
+            textEditContent: document.getElementById('textEditContent'),
+            textEditColor: document.getElementById('textEditColor'),
+            textEditSize: document.getElementById('textEditSize')
+        };
+
+        function log(msg, level = 'info') {
+            DOM.log.innerText = `> ${msg}`;
+            const color = level === 'error' ? '#ff9dc1' : level === 'success' ? '#93ffd5' : '#b8f5dc';
+            DOM.log.style.color = color;
+        }
+
+        function setStatus(label, mode = 'idle') {
+            DOM.statusPill.innerText = `状态: ${label}`;
+            if (mode === 'busy') {
+                DOM.statusPill.style.borderColor = 'rgba(255, 165, 79, 0.55)';
+                DOM.statusPill.style.background = 'rgba(76, 43, 8, 0.42)';
+                DOM.statusPill.style.color = '#ffc894';
+            } else if (mode === 'ok') {
+                DOM.statusPill.style.borderColor = 'rgba(83, 215, 168, 0.45)';
+                DOM.statusPill.style.background = 'rgba(14, 57, 48, 0.42)';
+                DOM.statusPill.style.color = '#8fffd4';
+            } else if (mode === 'error') {
+                DOM.statusPill.style.borderColor = 'rgba(255, 110, 148, 0.55)';
+                DOM.statusPill.style.background = 'rgba(69, 18, 37, 0.42)';
+                DOM.statusPill.style.color = '#ff98bc';
+            } else {
+                DOM.statusPill.style.borderColor = 'rgba(165, 138, 237, 0.5)';
+                DOM.statusPill.style.background = 'rgba(25, 18, 48, 0.52)';
+                DOM.statusPill.style.color = '#d8c9ff';
+            }
+        }
+
+        function updateSceneCounter() {
+            const count = document.querySelectorAll('.scene-card').length;
+            DOM.sceneCounter.innerText = `场景: ${count}`;
+        }
+
+        function releaseObjectUrls() {
+            Engine.objectUrls.forEach(url => URL.revokeObjectURL(url));
+            Engine.objectUrls = [];
+        }
+
+        function clearPlaybackState() {
+            clearTimeout(Engine.sceneTimer);
+            Engine.sceneTimer = null;
+            if (Engine.activeVoice) {
+                try { Engine.activeVoice.stop(); } catch (e) {}
+                Engine.activeVoice.disconnect();
+                Engine.activeVoice = null;
+            }
+        }
+
+        function addScene() {
+            sceneCount++;
+            const id = sceneCount;
+            const html = `
+                <div class="scene-card" id="scene-${id}" data-scene-id="${id}">
+                    <div class="scene-header">
+                        <span>场景 ${id}</span>
+                        <button class="scene-remove" onclick="removeScene(${id})">删除</button>
+                    </div>
+
+                    <div class="ctrl-group">
+                        <label>素材来源</label>
+                        <select id="source-${id}" onchange="toggleSource(${id})">
+                            <option value="pexels">自动搜索 Pexels 视频</option>
+                            <option value="local">上传本地视频素材</option>
+                        </select>
+                    </div>
+
+                    <div id="input-pexels-${id}" class="ctrl-group">
+                        <label>Pexels 英文关键词</label>
+                        <input type="text" id="keyword-${id}" placeholder="例如: nature, cyberpunk city">
+                    </div>
+
+                    <div id="input-local-${id}" class="ctrl-group" style="display:none;">
+                        <label>本地视频文件</label>
+                        <input type="file" id="file-${id}" accept="video/*">
+                    </div>
+
+                    <div class="ctrl-group">
+                        <label>配音角色</label>
+                        <select id="voice-${id}">
+                            <option value="1">标准男声</option>
+                            <option value="0">标准女声</option>
+                            <option value="3">情感男声(度逍遥)</option>
+                            <option value="4">童音(度丫丫)</option>
+                        </select>
+                    </div>
+
+                    <div class="ctrl-group">
+                        <label>旁白字幕 (将生成配音)</label>
+                        <textarea id="text-${id}" rows="2" placeholder="在此输入解说词..."></textarea>
+                    </div>
+                </div>
+            `;
+            document.getElementById('scenesContainer').insertAdjacentHTML('beforeend', html);
+            updateSceneCounter();
+        }
+
+        function removeScene(id) {
+            const card = document.getElementById(`scene-${id}`);
+            if (!card) return;
+
+            const cards = document.querySelectorAll('.scene-card');
+            if (cards.length <= 1) {
+                alert('至少保留一个场景。');
+                return;
+            }
+            card.remove();
+            updateSceneCounter();
+        }
+
+        function toggleSource(id) {
+            const val = document.getElementById(`source-${id}`).value;
+            document.getElementById(`input-pexels-${id}`).style.display = val === 'pexels' ? 'block' : 'none';
+            document.getElementById(`input-local-${id}`).style.display = val === 'local' ? 'block' : 'none';
+        }
+
+        addScene();
+
+        function syncTextInspector() {
+            const disabled = !activeTextBox;
+            DOM.textEditContent.disabled = disabled;
+            DOM.textEditColor.disabled = disabled;
+            DOM.textEditSize.disabled = disabled;
+
+            if (disabled) {
+                DOM.textEditContent.value = '';
+                DOM.textEditColor.value = '#ffffff';
+                DOM.textEditSize.value = 24;
                 return;
             }
 
-            renderTimeline(parsedScenes);
-            statusOverlay.innerHTML = "正在调用 AI 生成画面接口...<br>(使用 Pollinations AI，可能需要几秒)";
-            parseBtn.disabled = true;
+            DOM.textEditContent.value = activeTextBox.text;
+            DOM.textEditColor.value = activeTextBox.color;
+            DOM.textEditSize.value = Math.round(activeTextBox.size);
+        }
 
-            // 预加载所有生成的AI图像
-            await preloadImages(parsedScenes);
+        function selectTextBox(txtObj) {
+            activeTextBox = txtObj;
+            Engine.textBoxes.forEach(item => item.el.classList.remove('active'));
+            txtObj.el.classList.add('active');
+            syncTextInspector();
+        }
 
-            statusOverlay.classList.add('hidden');
-            parseBtn.disabled = false;
-            playBtn.disabled = false;
-        });
+        function applyTextStyle(txtObj) {
+            txtObj.el.innerText = txtObj.text;
+            txtObj.el.style.color = txtObj.color;
+            txtObj.el.style.fontSize = `${txtObj.size}px`;
+            txtObj.el.style.fontFamily = document.getElementById('fontFamily').value;
+        }
 
-        // 第二步：播放视频 (状态机)
-        playBtn.addEventListener('click', () => {
-            if (isPlaying) return;
-            isPlaying = true;
-            playBtn.disabled = true;
-            currentSceneIndex = 0;
-            videoImage.classList.remove('hidden');
-            videoCaption.classList.remove('hidden');
-            playNextScene();
-        });
+        function applyTextPositionFromPct(txtObj) {
+            const w = DOM.preview.clientWidth;
+            const h = DOM.preview.clientHeight;
+            txtObj.el.style.left = `${Math.max(0, Math.min(w - txtObj.el.offsetWidth, txtObj.x_pct * w))}px`;
+            txtObj.el.style.top = `${Math.max(0, Math.min(h - txtObj.el.offsetHeight, txtObj.y_pct * h))}px`;
+        }
 
-        // 核心逻辑：基于状态机播放场景
-        function playNextScene() {
-            if (currentSceneIndex >= parsedScenes.length) {
-                endVideo();
-                return;
-            }
+        function repositionTextBoxes() {
+            Engine.textBoxes.forEach(txt => applyTextPositionFromPct(txt));
+        }
 
-            const scene = parsedScenes[currentSceneIndex];
-            
-            // 更新UI
-            videoImage.src = scene.imageUrl;
-            videoCaption.innerText = scene.audio;
-            highlightTimeline(currentSceneIndex);
-
-            // 调用 Web Speech API 朗读旁白
-            const utterance = new SpeechSynthesisUtterance(scene.audio);
-            utterance.lang = 'zh-CN';
-            utterance.rate = 1.0; // 语速
-            utterance.pitch = 1.0;
-
-            // 语音播放结束时，自动切换下一幕
-            utterance.onend = () => {
-                currentSceneIndex++;
-                playNextScene();
+        function addTextBox() {
+            const id = `txt_${Date.now()}`;
+            const el = document.createElement('div');
+            const txtObj = {
+                id,
+                el,
+                text: '双击修改',
+                x_pct: 0.3,
+                y_pct: 0.3,
+                color: '#ffffff',
+                size: 24
             };
 
-            window.speechSynthesis.speak(utterance);
+            el.className = 'draggable-text';
+            el.dataset.textId = id;
+            applyTextStyle(txtObj);
+
+            Engine.textBoxes.push(txtObj);
+            DOM.textLayer.appendChild(el);
+
+            makeDraggable(el, txtObj);
+            makeEditable(el, txtObj);
+
+            requestAnimationFrame(() => {
+                applyTextPositionFromPct(txtObj);
+                selectTextBox(txtObj);
+            });
         }
 
-        function endVideo() {
-            isPlaying = false;
-            playBtn.disabled = false;
-            playBtn.innerText = "🔄 重新播放";
-            videoCaption.innerText = "";
-            statusOverlay.classList.remove('hidden');
-            statusOverlay.innerHTML = "视频播放结束";
-            videoImage.classList.add('hidden');
+        function deleteActiveTextBox() {
+            if (!activeTextBox) return;
+            const id = activeTextBox.id;
+            activeTextBox.el.remove();
+            Engine.textBoxes = Engine.textBoxes.filter(t => t.id !== id);
+            activeTextBox = null;
+            syncTextInspector();
         }
 
-        // ============ 底层辅助工具函数 ============
+        function makeDraggable(el, txtObj) {
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                selectTextBox(txtObj);
+                Engine.dragState.box = txtObj;
+                Engine.dragState.startX = e.clientX;
+                Engine.dragState.startY = e.clientY;
+                Engine.dragState.startL = el.offsetLeft;
+                Engine.dragState.startT = el.offsetTop;
+                el.style.cursor = 'grabbing';
+            });
+        }
 
-        // 正则解析器
-        function parseScript(scriptText) {
-            const scenes = [];
-            // 按双换行符分割场景块
-            const blocks = scriptText.split(/\n\s*\n/); 
-            
-            blocks.forEach((block, index) => {
-                // 提取画面和旁白 (容错处理：支持中文冒号和英文冒号)
-                const visualMatch = block.match(/画面[：:]\s*(.*)/);
-                const audioMatch = block.match(/旁白[：:]\s*(.*)/);
-
-                if (visualMatch && audioMatch) {
-                    scenes.push({
-                        id: index + 1,
-                        visual: visualMatch[1],
-                        audio: audioMatch[1],
-                        // 使用 Pollinations.ai 的实时文本转图像接口
-                        // 加入参数增强效果，随机种子保证每次生成不一致
-                        imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent(visualMatch[1] + ", cinematic, 8k, highly detailed")}?width=800&height=450&nologo=true&seed=${Math.floor(Math.random()*1000)}`
-                    });
+        function makeEditable(el, txtObj) {
+            el.addEventListener('dblclick', () => {
+                const nt = prompt('修改文字：', txtObj.text);
+                if (nt !== null && nt.trim() !== '') {
+                    txtObj.text = nt.trim();
+                    applyTextStyle(txtObj);
+                    syncTextInspector();
                 }
             });
-            return scenes;
+
+            el.addEventListener('click', () => selectTextBox(txtObj));
         }
 
-        // 预加载图片以防播放时卡顿
-        async function preloadImages(scenes) {
-            const promises = scenes.map(scene => {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.src = scene.imageUrl;
-                    img.onload = resolve;
-                    img.onerror = resolve; // 即使失败也继续
-                });
-            });
-            await Promise.all(promises);
-        }
+        document.addEventListener('pointermove', (e) => {
+            const target = Engine.dragState.box;
+            if (!target) return;
 
-        // 渲染时间轴
-        function renderTimeline(scenes) {
-            sceneList.innerHTML = '';
-            scenes.forEach((scene, index) => {
-                const div = document.createElement('div');
-                div.className = 'scene-item';
-                div.id = `timeline-scene-${index}`;
-                div.innerHTML = `
-                    <strong>场景 ${scene.id}</strong><br>
-                    🎞 画面提示词: ${scene.visual}<br>
-                    🔊 语音文本: ${scene.audio}
-                `;
-                sceneList.appendChild(div);
-            });
-        }
+            const dx = e.clientX - Engine.dragState.startX;
+            const dy = e.clientY - Engine.dragState.startY;
+            const maxL = DOM.preview.clientWidth - target.el.offsetWidth;
+            const maxT = DOM.preview.clientHeight - target.el.offsetHeight;
+            const newL = Math.max(0, Math.min(maxL, Engine.dragState.startL + dx));
+            const newT = Math.max(0, Math.min(maxT, Engine.dragState.startT + dy));
 
-        // 高亮当前播放的时间轴项
-        function highlightTimeline(index) {
-            document.querySelectorAll('.scene-item').forEach(el => el.classList.remove('active'));
-            const activeItem = document.getElementById(`timeline-scene-${index}`);
-            if (activeItem) {
-                activeItem.classList.add('active');
-                activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.el.style.left = `${newL}px`;
+            target.el.style.top = `${newT}px`;
+
+            target.x_pct = DOM.preview.clientWidth ? newL / DOM.preview.clientWidth : 0;
+            target.y_pct = DOM.preview.clientHeight ? newT / DOM.preview.clientHeight : 0;
+        });
+
+        document.addEventListener('pointerup', () => {
+            if (Engine.dragState.box) {
+                Engine.dragState.box.el.style.cursor = 'grab';
             }
+            Engine.dragState.box = null;
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+            if ((e.key === 'Delete' || e.key === 'Backspace') && activeTextBox) {
+                e.preventDefault();
+                deleteActiveTextBox();
+            }
+        });
+
+        DOM.textEditContent.addEventListener('input', (e) => {
+            if (!activeTextBox) return;
+            activeTextBox.text = e.target.value || ' ';
+            applyTextStyle(activeTextBox);
+        });
+
+        DOM.textEditColor.addEventListener('input', (e) => {
+            if (!activeTextBox) return;
+            activeTextBox.color = e.target.value;
+            applyTextStyle(activeTextBox);
+        });
+
+        DOM.textEditSize.addEventListener('input', (e) => {
+            if (!activeTextBox) return;
+            const size = Math.max(12, Math.min(200, Number(e.target.value) || 24));
+            activeTextBox.size = size;
+            applyTextStyle(activeTextBox);
+            applyTextPositionFromPct(activeTextBox);
+        });
+
+        function applySubtitlePreviewStyle() {
+            DOM.subtitle.style.fontSize = `${Math.max(16, Number(document.getElementById('fontSize').value) * 0.45)}px`;
+            DOM.subtitle.style.color = document.getElementById('fontColor').value;
+            DOM.subtitle.style.fontFamily = document.getElementById('fontFamily').value;
+            Engine.textBoxes.forEach(applyTextStyle);
         }
+
+        ['fontSize', 'fontColor', 'fontFamily'].forEach((id) => {
+            document.getElementById(id).addEventListener('input', applySubtitlePreviewStyle);
+            document.getElementById(id).addEventListener('change', applySubtitlePreviewStyle);
+        });
+
+        function getPreferredMimeType() {
+            const candidates = [
+                'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp8,opus',
+                'video/webm;codecs=vp8',
+                'video/webm'
+            ];
+            return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        async function getVideoDuration(url) {
+            return new Promise((resolve) => {
+                const probe = document.createElement('video');
+                let done = false;
+                const finalize = (val) => {
+                    if (done) return;
+                    done = true;
+                    probe.removeAttribute('src');
+                    probe.load();
+                    resolve(val);
+                };
+
+                probe.preload = 'metadata';
+                probe.crossOrigin = 'anonymous';
+                probe.onloadedmetadata = () => {
+                    const duration = Number.isFinite(probe.duration) && probe.duration > 0 ? probe.duration : 4;
+                    finalize(duration);
+                };
+                probe.onerror = () => finalize(4);
+                probe.src = url;
+                setTimeout(() => finalize(4), 7000);
+            });
+        }
+
+        async function tryDecodeAudioFromUrl(url) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('音频请求失败');
+            const arr = await res.arrayBuffer();
+            return await Engine.audioCtx.decodeAudioData(arr);
+        }
+
+        async function fetchTTSBuffer(text, voiceId) {
+            const ttsUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${voiceId}`;
+            const candidates = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`,
+                ttsUrl
+            ];
+
+            for (const candidate of candidates) {
+                try {
+                    const audioBuffer = await tryDecodeAudioFromUrl(candidate);
+                    return audioBuffer;
+                } catch (err) {
+                    console.warn('TTS 获取失败:', candidate);
+                }
+            }
+            return null;
+        }
+
+        document.getElementById('generateBtn').onclick = async function () {
+            const btn = this;
+            btn.disabled = true;
+            document.getElementById('playRecordBtn').disabled = true;
+            document.getElementById('playRecordBtn').innerText = '第二步: 播放并录制';
+            document.getElementById('downloadBtn').disabled = true;
+            Engine.scenes = [];
+            clearPlaybackState();
+            releaseObjectUrls();
+            setStatus('资产解析中', 'busy');
+
+            try {
+                log('正在初始化引擎并抓取资产...');
+
+                if (!Engine.audioCtx) Engine.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (Engine.audioCtx.state === 'suspended') await Engine.audioCtx.resume();
+
+                const bgmFile = document.getElementById('bgmInput').files[0];
+                Engine.bgmBuffer = null;
+                if (bgmFile) {
+                    log('正在解码全局 BGM...');
+                    Engine.bgmBuffer = await Engine.audioCtx.decodeAudioData(await bgmFile.arrayBuffer());
+                }
+
+                const sceneCards = [...document.querySelectorAll('.scene-card')];
+                if (!sceneCards.length) throw new Error('请至少添加一个场景。');
+
+                for (let idx = 0; idx < sceneCards.length; idx++) {
+                    const card = sceneCards[idx];
+                    const id = card.dataset.sceneId;
+                    log(`正在处理场景 ${idx + 1}/${sceneCards.length}...`);
+
+                    const source = document.getElementById(`source-${id}`).value;
+                    const text = document.getElementById(`text-${id}`).value.trim();
+                    const voiceId = document.getElementById(`voice-${id}`).value;
+                    let videoUrl = null;
+                    let audioBuffer = null;
+
+                    if (source === 'pexels') {
+                        const key = pexelsInput.value.trim();
+                        if (!key) throw new Error('请先填写 Pexels API Key。');
+                        const kw = document.getElementById(`keyword-${id}`).value.trim();
+                        if (!kw) throw new Error(`场景 ${idx + 1} 请选择关键词。`);
+
+                        const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(kw)}&per_page=5`, {
+                            headers: { Authorization: key }
+                        });
+
+                        if (!res.ok) throw new Error(`场景 ${idx + 1} 的 Pexels 请求失败 (${res.status})。`);
+                        const data = await res.json();
+
+                        if (!data.videos || !data.videos.length) {
+                            throw new Error(`场景 ${idx + 1} 未找到关键词 '${kw}' 相关视频。`);
+                        }
+
+                        const files = data.videos[0].video_files || [];
+                        const picked = files.sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+                        if (!picked || !picked.link) throw new Error(`场景 ${idx + 1} 视频地址无效。`);
+                        videoUrl = picked.link;
+                    } else {
+                        const file = document.getElementById(`file-${id}`).files[0];
+                        if (!file) throw new Error(`请为场景 ${idx + 1} 上传本地视频。`);
+                        videoUrl = URL.createObjectURL(file);
+                        Engine.objectUrls.push(videoUrl);
+                    }
+
+                    if (text) {
+                        audioBuffer = await fetchTTSBuffer(text, voiceId);
+                    }
+
+                    const videoDuration = await getVideoDuration(videoUrl);
+                    const duration = audioBuffer ? audioBuffer.duration : videoDuration;
+
+                    Engine.scenes.push({
+                        id,
+                        videoUrl,
+                        text,
+                        audioBuffer,
+                        duration: Math.max(1, duration || 4)
+                    });
+                }
+
+                log('资产解析完成，可以开始录制。', 'success');
+                setStatus('资产就绪', 'ok');
+                document.getElementById('playRecordBtn').disabled = false;
+            } catch (err) {
+                console.error(err);
+                log(`解析失败: ${err.message}`, 'error');
+                setStatus('解析失败', 'error');
+                alert(err.message || '资产解析失败，请检查输入后重试。');
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        document.getElementById('playRecordBtn').onclick = async function () {
+            if (!Engine.scenes.length) {
+                alert('请先执行第一步解析场景资产。');
+                return;
+            }
+
+            if (!Engine.audioCtx) Engine.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (Engine.audioCtx.state === 'suspended') await Engine.audioCtx.resume();
+
+            log('启动混流渲染管线...');
+            setStatus('录制中', 'busy');
+            this.disabled = true;
+            this.innerText = '录制中...';
+            document.getElementById('downloadBtn').disabled = true;
+
+            Engine.isPlaying = true;
+            Engine.currentIdx = 0;
+            Engine.recordedChunks = [];
+
+            const [w, h] = document.getElementById('videoSize').value.split(',').map(Number);
+            DOM.canvas.width = w;
+            DOM.canvas.height = h;
+
+            clearPlaybackState();
+
+            const dest = Engine.audioCtx.createMediaStreamDestination();
+            let bgmSrc = null;
+            if (Engine.bgmBuffer) {
+                bgmSrc = Engine.audioCtx.createBufferSource();
+                bgmSrc.buffer = Engine.bgmBuffer;
+                bgmSrc.loop = true;
+                const gain = Engine.audioCtx.createGain();
+                gain.gain.value = parseFloat(document.getElementById('bgmVolume').value);
+                bgmSrc.connect(gain).connect(dest);
+                gain.connect(Engine.audioCtx.destination);
+                bgmSrc.start(0);
+            }
+
+            const vStream = DOM.canvas.captureStream(30);
+            const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+
+            const mimeType = getPreferredMimeType();
+            try {
+                Engine.mediaRecorder = mimeType ? new MediaRecorder(mixStream, { mimeType }) : new MediaRecorder(mixStream);
+            } catch (err) {
+                Engine.mediaRecorder = new MediaRecorder(mixStream);
+            }
+
+            Engine.mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) Engine.recordedChunks.push(e.data);
+            };
+
+            Engine.mediaRecorder.onstop = () => {
+                clearPlaybackState();
+                Engine.isPlaying = false;
+                cancelAnimationFrame(Engine.animFrame);
+                DOM.player.pause();
+                DOM.player.removeAttribute('src');
+                DOM.player.load();
+                DOM.player.style.display = 'none';
+                DOM.subtitle.innerText = '';
+
+                if (bgmSrc) {
+                    try { bgmSrc.stop(); } catch (e) {}
+                }
+
+                this.disabled = false;
+                this.innerText = '重新录制';
+                document.getElementById('downloadBtn').disabled = Engine.recordedChunks.length === 0;
+                log('视频录制结束，点击下载保存。', 'success');
+                setStatus('录制完成', 'ok');
+            };
+
+            Engine.mediaRecorder.start(400);
+            playNextScene(dest);
+            renderLoop();
+        };
+
+        function playNextScene(dest) {
+            if (!Engine.isPlaying) return;
+
+            if (Engine.currentIdx >= Engine.scenes.length) {
+                Engine.isPlaying = false;
+                if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
+                    Engine.mediaRecorder.stop();
+                }
+                return;
+            }
+
+            clearPlaybackState();
+            const scene = Engine.scenes[Engine.currentIdx];
+            log(`正在渲染场景 ${Engine.currentIdx + 1}/${Engine.scenes.length}...`);
+
+            DOM.player.style.display = 'block';
+            DOM.player.src = scene.videoUrl;
+            DOM.subtitle.innerText = scene.text || '';
+            applySubtitlePreviewStyle();
+
+            let advanced = false;
+            const advance = () => {
+                if (advanced) return;
+                advanced = true;
+                Engine.currentIdx += 1;
+                playNextScene(dest);
+            };
+
+            DOM.player.onended = () => {
+                if (!scene.audioBuffer) advance();
+            };
+            DOM.player.onerror = () => {
+                log(`场景 ${Engine.currentIdx + 1} 视频加载失败，自动跳过。`, 'error');
+                advance();
+            };
+
+            DOM.player.oncanplay = async () => {
+                try { await DOM.player.play(); } catch (e) {}
+
+                if (scene.audioBuffer) {
+                    const voice = Engine.audioCtx.createBufferSource();
+                    voice.buffer = scene.audioBuffer;
+                    voice.connect(dest);
+                    voice.connect(Engine.audioCtx.destination);
+                    Engine.activeVoice = voice;
+
+                    voice.onended = advance;
+                    voice.start(0);
+
+                    Engine.sceneTimer = setTimeout(advance, (scene.duration + 0.15) * 1000);
+                } else {
+                    Engine.sceneTimer = setTimeout(advance, scene.duration * 1000);
+                }
+            };
+        }
+
+        function splitTextLines(ctx, text, maxWidth, maxLines) {
+            const chars = [...text];
+            const lines = [];
+            let line = '';
+
+            chars.forEach((ch) => {
+                const test = line + ch;
+                if (ctx.measureText(test).width > maxWidth && line) {
+                    lines.push(line);
+                    line = ch;
+                } else {
+                    line = test;
+                }
+            });
+
+            if (line) lines.push(line);
+            if (lines.length <= maxLines) return lines;
+
+            const trimmed = lines.slice(0, maxLines);
+            const last = trimmed[maxLines - 1];
+            trimmed[maxLines - 1] = `${last.slice(0, Math.max(1, last.length - 1))}…`;
+            return trimmed;
+        }
+
+        function renderLoop() {
+            if (!Engine.isPlaying) return;
+
+            const ctx = DOM.ctx;
+            const w = DOM.canvas.width;
+            const h = DOM.canvas.height;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, w, h);
+
+            if (DOM.player.readyState >= 2) {
+                const vw = DOM.player.videoWidth;
+                const vh = DOM.player.videoHeight;
+                if (vw && vh) {
+                    const scale = Math.max(w / vw, h / vh);
+                    const dw = vw * scale;
+                    const dh = vh * scale;
+                    ctx.drawImage(DOM.player, (w - dw) / 2, (h - dh) / 2, dw, dh);
+                }
+            }
+
+            if (DOM.subtitle.innerText) {
+                const fontFamily = document.getElementById('fontFamily').value;
+                const fontSize = Math.max(18, Number(document.getElementById('fontSize').value) || 55);
+                ctx.font = `700 ${fontSize}px ${fontFamily}`;
+
+                const lines = splitTextLines(ctx, DOM.subtitle.innerText, w * 0.85, 3);
+                const lineHeight = fontSize + 12;
+                const boxHeight = lines.length * lineHeight + 24;
+                const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width), 100);
+                const boxWidth = Math.min(w * 0.92, maxLineWidth + 44);
+                const boxX = (w - boxWidth) / 2;
+                const boxY = h * 0.89 - boxHeight;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.46)';
+                ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+                ctx.fillStyle = document.getElementById('fontColor').value;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 9;
+
+                lines.forEach((line, i) => {
+                    ctx.fillText(line, w / 2, boxY + 12 + i * lineHeight);
+                });
+
+                ctx.shadowBlur = 0;
+            }
+
+            const previewH = DOM.preview.clientHeight || h;
+            const textScale = h / previewH;
+            const textFont = document.getElementById('fontFamily').value;
+
+            Engine.textBoxes.forEach((txt) => {
+                const renderSize = Math.max(12, txt.size * textScale);
+                ctx.font = `700 ${renderSize}px ${textFont}`;
+                ctx.fillStyle = txt.color;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.shadowColor = 'rgba(0,0,0,0.85)';
+                ctx.shadowBlur = 6;
+                ctx.fillText(txt.text, txt.x_pct * w, txt.y_pct * h);
+                ctx.shadowBlur = 0;
+            });
+
+            Engine.animFrame = requestAnimationFrame(renderLoop);
+        }
+
+        document.getElementById('downloadBtn').onclick = () => {
+            if (!Engine.recordedChunks.length) {
+                alert('暂无可下载的视频，请先录制。');
+                return;
+            }
+
+            const blob = new Blob(Engine.recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AI全能矩阵视频_${Date.now()}.webm`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            log('下载已触发。', 'success');
+        };
+
+        window.addEventListener('resize', repositionTextBoxes);
+        applySubtitlePreviewStyle();
+        syncTextInspector();
+        updateSceneCounter();
     </script>
 </body>
 </html>
