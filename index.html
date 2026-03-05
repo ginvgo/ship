@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 脚本转视频引擎引擎</title>
+    <style>
+        :root {
+            --bg-color: #1e1e24;
+            --panel-bg: #2b2b36;
+            --primary: #6c5ce7;
+            --text: #f5f6fa;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            height: 100vh;
+            box-sizing: border-box;
+            gap: 20px;
+        }
+        /* 左侧脚本编辑区 */
+        .editor-panel {
+            flex: 1;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        textarea {
+            flex: 1;
+            background: #1a1a20;
+            color: #a4b0be;
+            border: 1px solid #4b4b5c;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 14px;
+            resize: none;
+            line-height: 1.6;
+            outline: none;
+        }
+        .btn-group {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: 0.3s;
+            flex: 1;
+        }
+        button:hover { background: #5f27cd; }
+        button:disabled { background: #576574; cursor: not-allowed; }
+
+        /* 右侧播放与时间轴区 */
+        .player-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .video-container {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #videoImage {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.5s;
+        }
+        #videoCaption {
+            position: absolute;
+            bottom: 20px;
+            width: 80%;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8), -2px -2px 4px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .status-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            z-index: 10;
+        }
+        .hidden { display: none !important; }
+
+        /* 时间轴 */
+        .timeline {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        .scene-item {
+            background: #353b48;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid transparent;
+            font-size: 13px;
+        }
+        .scene-item.active {
+            border-left-color: var(--primary);
+            background: #2f3640;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 左侧：脚本输入 -->
+    <div class="editor-panel">
+        <h2>📝 视频脚本</h2>
+        <p style="font-size: 12px; color: #7f8fa6;">请按格式输入脚本，工具将自动解析画面与配音。</p>
+        <textarea id="scriptInput">场景1：
+画面：一个赛博朋克风格的未来城市，霓虹灯闪烁，下着大雨，电影质感。
+旁白：在2077年的不夜城，雨水洗刷着金属的街道。
+
+场景2：
+画面：一个机器人背影，站在摩天大楼天台边缘，俯瞰城市。
+旁白：它们被制造出来，却在寻找属于自己的灵魂。
+
+场景3：
+画面：镜头特写，机器人的眼睛亮起蓝色的光芒。
+旁白：觉醒，往往只在一瞬间。</textarea>
+        <div class="btn-group">
+            <button id="parseBtn">解析并生成资产</button>
+            <button id="playBtn" disabled>▶ 开始播放视频</button>
+        </div>
+    </div>
+
+    <!-- 右侧：播放器与时间轴 -->
+    <div class="player-panel">
+        <div class="video-container">
+            <div id="statusOverlay" class="status-overlay">等待解析脚本...</div>
+            <img id="videoImage" src="" class="hidden">
+            <div id="videoCaption" class="hidden"></div>
+        </div>
+        
+        <div class="timeline" id="timeline">
+            <h3 style="margin-top:0;">⏱ 时间轴 (解析结果)</h3>
+            <div id="sceneList" style="color:#7f8fa6; font-size:14px;">暂无场景</div>
+        </div>
+    </div>
+
+    <script>
+        let parsedScenes = [];
+        let currentSceneIndex = 0;
+        let isPlaying = false;
+        
+        // DOM 元素
+        const scriptInput = document.getElementById('scriptInput');
+        const parseBtn = document.getElementById('parseBtn');
+        const playBtn = document.getElementById('playBtn');
+        const statusOverlay = document.getElementById('statusOverlay');
+        const videoImage = document.getElementById('videoImage');
+        const videoCaption = document.getElementById('videoCaption');
+        const sceneList = document.getElementById('sceneList');
+
+        // 第一步：解析脚本
+        parseBtn.addEventListener('click', async () => {
+            const text = scriptInput.value;
+            parsedScenes = parseScript(text);
+            
+            if (parsedScenes.length === 0) {
+                alert("未解析到场景，请检查格式！格式需包含“画面：”和“旁白：”");
+                return;
+            }
+
+            renderTimeline(parsedScenes);
+            statusOverlay.innerHTML = "正在调用 AI 生成画面接口...<br>(使用 Pollinations AI，可能需要几秒)";
+            parseBtn.disabled = true;
+
+            // 预加载所有生成的AI图像
+            await preloadImages(parsedScenes);
+
+            statusOverlay.classList.add('hidden');
+            parseBtn.disabled = false;
+            playBtn.disabled = false;
+        });
+
+        // 第二步：播放视频 (状态机)
+        playBtn.addEventListener('click', () => {
+            if (isPlaying) return;
+            isPlaying = true;
+            playBtn.disabled = true;
+            currentSceneIndex = 0;
+            videoImage.classList.remove('hidden');
+            videoCaption.classList.remove('hidden');
+            playNextScene();
+        });
+
+        // 核心逻辑：基于状态机播放场景
+        function playNextScene() {
+            if (currentSceneIndex >= parsedScenes.length) {
+                endVideo();
+                return;
+            }
+
+            const scene = parsedScenes[currentSceneIndex];
+            
+            // 更新UI
+            videoImage.src = scene.imageUrl;
+            videoCaption.innerText = scene.audio;
+            highlightTimeline(currentSceneIndex);
+
+            // 调用 Web Speech API 朗读旁白
+            const utterance = new SpeechSynthesisUtterance(scene.audio);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 1.0; // 语速
+            utterance.pitch = 1.0;
+
+            // 语音播放结束时，自动切换下一幕
+            utterance.onend = () => {
+                currentSceneIndex++;
+                playNextScene();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function endVideo() {
+            isPlaying = false;
+            playBtn.disabled = false;
+            playBtn.innerText = "🔄 重新播放";
+            videoCaption.innerText = "";
+            statusOverlay.classList.remove('hidden');
+            statusOverlay.innerHTML = "视频播放结束";
+            videoImage.classList.add('hidden');
+        }
+
+        // ============ 底层辅助工具函数 ============
+
+        // 正则解析器
+        function parseScript(scriptText) {
+            const scenes = [];
+            // 按双换行符分割场景块
+            const blocks = scriptText.split(/\n\s*\n/); 
+            
+            blocks.forEach((block, index) => {
+                // 提取画面和旁白 (容错处理：支持中文冒号和英文冒号)
+                const visualMatch = block.match(/画面[：:]\s*(.*)/);
+                const audioMatch = block.match(/旁白[：:]\s*(.*)/);
+
+                if (visualMatch && audioMatch) {
+                    scenes.push({
+                        id: index + 1,
+                        visual: visualMatch[1],
+                        audio: audioMatch[1],
+                        // 使用 Pollinations.ai 的实时文本转图像接口
+                        // 加入参数增强效果，随机种子保证每次生成不一致
+                        imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent(visualMatch[1] + ", cinematic, 8k, highly detailed")}?width=800&height=450&nologo=true&seed=${Math.floor(Math.random()*1000)}`
+                    });
+                }
+            });
+            return scenes;
+        }
+
+        // 预加载图片以防播放时卡顿
+        async function preloadImages(scenes) {
+            const promises = scenes.map(scene => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.src = scene.imageUrl;
+                    img.onload = resolve;
+                    img.onerror = resolve; // 即使失败也继续
+                });
+            });
+            await Promise.all(promises);
+        }
+
+        // 渲染时间轴
+        function renderTimeline(scenes) {
+            sceneList.innerHTML = '';
+            scenes.forEach((scene, index) => {
+                const div = document.createElement('div');
+                div.className = 'scene-item';
+                div.id = `timeline-scene-${index}`;
+                div.innerHTML = `
+                    <strong>场景 ${scene.id}</strong><br>
+                    🎞 画面提示词: ${scene.visual}<br>
+                    🔊 语音文本: ${scene.audio}
+                `;
+                sceneList.appendChild(div);
+            });
+        }
+
+        // 高亮当前播放的时间轴项
+        function highlightTimeline(index) {
+            document.querySelectorAll('.scene-item').forEach(el => el.classList.remove('active'));
+            const activeItem = document.getElementById(`timeline-scene-${index}`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+                activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    </script>
+</body>
+</html>
