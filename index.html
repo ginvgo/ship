@@ -286,6 +286,37 @@
             color: #8f83b5;
         }
 
+        .bgm-library {
+            border: 1px solid rgba(107, 70, 199, 0.5);
+            border-radius: 10px;
+            background: rgba(13, 8, 26, 0.76);
+            padding: 9px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .bgm-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .bgm-actions button {
+            padding: 7px 10px;
+            font-size: 12px;
+        }
+
+        .bgm-list {
+            min-height: 112px;
+            max-height: 170px;
+            font-size: 12px;
+        }
+
+        .bgm-hint {
+            font-size: 11px;
+            color: #9183bc;
+        }
+
         @keyframes cardIn {
             from {
                 opacity: 0;
@@ -422,6 +453,11 @@
         .toolbar-row {
             display: flex;
             flex-direction: column;
+            gap: 10px;
+        }
+
+        .action-row {
+            display: flex;
             gap: 10px;
         }
 
@@ -608,8 +644,16 @@
             </div>
 
             <div class="ctrl-group">
-                <label>全局背景音乐 (BGM)</label>
-                <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*">
+                <label>背景音乐库 (可多选)</label>
+                <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
+                <div class="bgm-library">
+                    <select id="bgmLibraryList" class="bgm-list" multiple></select>
+                    <div class="bgm-actions">
+                        <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
+                        <button type="button" id="clearBgmBtn">清空音乐库</button>
+                    </div>
+                    <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
+                </div>
                 <label>音量调节: <span id="bgmVolVal">15%</span></label>
                 <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
             </div>
@@ -705,9 +749,12 @@
 
             <div class="toolbar-row">
                 <button id="generateBtn" class="btn-green" style="height:42px;">第一步: 解析场景资产 (获取视频/配音)</button>
-                <div style="display:flex; gap:10px;">
+                <div class="action-row">
                     <button id="playRecordBtn" class="btn-red" style="flex:1; height:42px;" disabled>第二步: 播放并录制</button>
-                    <button id="downloadBtn" style="flex:1; height:42px;" disabled>第三步: 下载完整视频</button>
+                    <button id="downloadBtn" style="flex:1; height:42px;" disabled>第三步: 下载合并视频</button>
+                </div>
+                <div class="action-row">
+                    <button id="downloadScenesBtn" style="flex:1; height:42px;" disabled>下载每个场景视频</button>
                 </div>
                 <div id="statusLog" class="status-log">等待操作...</div>
             </div>
@@ -772,15 +819,19 @@
             scenes: [],
             textBoxes: [],
             audioCtx: null,
-            bgmBuffer: null,
+            bgmLibrary: [],
+            bgmBuffers: [],
             isPlaying: false,
+            isBatchExporting: false,
             currentIdx: 0,
             mediaRecorder: null,
             recordedChunks: [],
+            mergedBlob: null,
             animFrame: null,
             activeVoice: null,
             activeVoiceEl: null,
             activeVoiceNode: null,
+            activeBgmSources: [],
             sceneTimer: null,
             objectUrls: [],
             dragState: { box: null, startX: 0, startY: 0, startL: 0, startT: 0 },
@@ -798,6 +849,11 @@
             textLayer: document.getElementById('textLayer'),
             sceneCounter: document.getElementById('sceneCounter'),
             statusPill: document.querySelector('.status-pill'),
+            bgmInput: document.getElementById('bgmInput'),
+            bgmLibraryList: document.getElementById('bgmLibraryList'),
+            removeBgmBtn: document.getElementById('removeBgmBtn'),
+            clearBgmBtn: document.getElementById('clearBgmBtn'),
+            bgmVolume: document.getElementById('bgmVolume'),
             textEditContent: document.getElementById('textEditContent'),
             textEditColor: document.getElementById('textEditColor'),
             textEditSize: document.getElementById('textEditSize'),
@@ -806,7 +862,11 @@
             textEditY: document.getElementById('textEditY'),
             sceneDurationSummary: document.getElementById('sceneDurationSummary'),
             timelineTrack: document.getElementById('timelineTrack'),
-            timelineTotal: document.getElementById('timelineTotal')
+            timelineTotal: document.getElementById('timelineTotal'),
+            generateBtn: document.getElementById('generateBtn'),
+            playRecordBtn: document.getElementById('playRecordBtn'),
+            downloadBtn: document.getElementById('downloadBtn'),
+            downloadScenesBtn: document.getElementById('downloadScenesBtn')
         };
 
         function log(msg, level = 'info') {
@@ -915,6 +975,9 @@
         function clearPlaybackState() {
             clearTimeout(Engine.sceneTimer);
             Engine.sceneTimer = null;
+            DOM.player.oncanplay = null;
+            DOM.player.onended = null;
+            DOM.player.onerror = null;
             if (Engine.activeVoice) {
                 try { Engine.activeVoice.stop(); } catch (e) {}
                 Engine.activeVoice.disconnect();
@@ -1025,6 +1088,71 @@
         });
 
         addScene();
+
+        function bgmTrackKey(file) {
+            return `${file.name}__${file.size}__${file.lastModified}`;
+        }
+
+        function refreshBgmLibraryList() {
+            const prevSelected = new Set(
+                [...DOM.bgmLibraryList.selectedOptions].map(opt => opt.value)
+            );
+            DOM.bgmLibraryList.innerHTML = '';
+            Engine.bgmLibrary.forEach((entry, idx) => {
+                const option = document.createElement('option');
+                option.value = entry.id;
+                option.text = `${idx + 1}. ${entry.name}`;
+                if (prevSelected.has(entry.id)) option.selected = true;
+                DOM.bgmLibraryList.appendChild(option);
+            });
+        }
+
+        function addBgmFilesToLibrary(fileList) {
+            const files = [...(fileList || [])];
+            if (!files.length) return;
+            const existing = new Set(Engine.bgmLibrary.map(item => item.id));
+            const addedIds = [];
+            files.forEach((file) => {
+                const id = bgmTrackKey(file);
+                if (existing.has(id)) return;
+                existing.add(id);
+                Engine.bgmLibrary.push({
+                    id,
+                    name: file.name,
+                    file,
+                    buffer: null
+                });
+                addedIds.push(id);
+            });
+            refreshBgmLibraryList();
+            if (addedIds.length) {
+                [...DOM.bgmLibraryList.options].forEach((opt) => {
+                    if (addedIds.includes(opt.value)) opt.selected = true;
+                });
+            }
+        }
+
+        function getSelectedBgmEntries() {
+            const selectedIds = new Set([...DOM.bgmLibraryList.selectedOptions].map(opt => opt.value));
+            return Engine.bgmLibrary.filter(item => selectedIds.has(item.id));
+        }
+
+        function removeSelectedBgmTracks() {
+            const selectedIds = new Set([...DOM.bgmLibraryList.selectedOptions].map(opt => opt.value));
+            if (!selectedIds.size) return;
+            Engine.bgmLibrary = Engine.bgmLibrary.filter(item => !selectedIds.has(item.id));
+            refreshBgmLibraryList();
+        }
+
+        DOM.bgmInput.addEventListener('change', (e) => {
+            addBgmFilesToLibrary(e.target.files);
+            DOM.bgmInput.value = '';
+        });
+        DOM.removeBgmBtn.addEventListener('click', removeSelectedBgmTracks);
+        DOM.clearBgmBtn.addEventListener('click', () => {
+            Engine.bgmLibrary = [];
+            refreshBgmLibraryList();
+        });
 
         function syncTextInspector() {
             const disabled = !activeTextBox;
@@ -1413,116 +1541,266 @@
             };
         }
 
-        document.getElementById('generateBtn').onclick = async function () {
-            const btn = this;
-            btn.disabled = true;
-            document.getElementById('playRecordBtn').disabled = true;
-            document.getElementById('playRecordBtn').innerText = '第二步: 播放并录制';
-            document.getElementById('downloadBtn').disabled = true;
+        function getTargetResolution() {
+            return document.getElementById('videoSize').value.split(',').map(Number);
+        }
+
+        async function ensureAudioContextReady() {
+            if (!Engine.audioCtx) Engine.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (Engine.audioCtx.state === 'suspended') await Engine.audioCtx.resume();
+        }
+
+        async function runWithLimit(items, limit, task) {
+            const results = new Array(items.length);
+            let cursor = 0;
+            const workers = new Array(Math.max(1, limit)).fill(0).map(async () => {
+                while (cursor < items.length) {
+                    const idx = cursor++;
+                    results[idx] = await task(items[idx], idx);
+                }
+            });
+            await Promise.all(workers);
+            return results;
+        }
+
+        function scorePexelsFile(file, targetW, targetH) {
+            const ratio = (file.width || 1) / (file.height || 1);
+            const targetRatio = targetW / targetH;
+            const ratioPenalty = Math.abs(ratio - targetRatio) * 18;
+            const pixels = Math.max(1, (file.width || 1) * (file.height || 1));
+            const targetPixels = Math.max(1, targetW * targetH);
+            const scale = pixels / targetPixels;
+            const oversizePenalty = scale > 1 ? (scale - 1) * 0.6 : (1 - scale) * 1.0;
+            const hugePenalty = scale > 4 ? (scale - 4) * 1.2 : 0;
+            return ratioPenalty + oversizePenalty + hugePenalty;
+        }
+
+        function pickBestPexelsFile(video, targetW, targetH) {
+            const files = (video.video_files || [])
+                .filter(item => item && item.link && item.width && item.height);
+            if (!files.length) return null;
+            return files.sort((a, b) => scorePexelsFile(a, targetW, targetH) - scorePexelsFile(b, targetW, targetH))[0];
+        }
+
+        function pickUniqueVideoByKeyword(videos, usedIds, targetW, targetH) {
+            const pool = videos
+                .filter(v => !usedIds.has(String(v.id)))
+                .map(v => ({ video: v, file: pickBestPexelsFile(v, targetW, targetH) }))
+                .filter(item => item.file && item.file.link);
+            if (!pool.length) return null;
+            pool.sort((a, b) => scorePexelsFile(a.file, targetW, targetH) - scorePexelsFile(b.file, targetW, targetH));
+            const picked = pool[0];
+            usedIds.add(String(picked.video.id));
+            return {
+                videoId: String(picked.video.id),
+                videoUrl: picked.file.link
+            };
+        }
+
+        function collectSceneDrafts() {
+            const cards = [...document.querySelectorAll('.scene-card')];
+            if (!cards.length) throw new Error('请至少添加一个场景。');
+
+            return cards.map((card, idx) => {
+                const id = card.dataset.sceneId;
+                const source = document.getElementById(`source-${id}`).value;
+                const text = document.getElementById(`text-${id}`).value.trim();
+                const voiceId = document.getElementById(`voice-${id}`).value;
+                const customDuration = readCustomSceneDuration(id);
+                const hasCustomDuration = customDuration > 0;
+
+                if (source === 'pexels') {
+                    const keyword = document.getElementById(`keyword-${id}`).value.trim();
+                    if (!keyword) throw new Error(`场景 ${idx + 1} 请选择关键词。`);
+                    return { idx, id, source, keyword, text, voiceId, customDuration, hasCustomDuration };
+                }
+
+                const file = document.getElementById(`file-${id}`).files[0];
+                if (!file) throw new Error(`请为场景 ${idx + 1} 上传本地视频。`);
+                return { idx, id, source, file, text, voiceId, customDuration, hasCustomDuration };
+            });
+        }
+
+        async function assignPexelsVideos(drafts, apiKey, targetW, targetH) {
+            const keywordMap = new Map();
+            drafts.forEach((draft) => {
+                if (draft.source !== 'pexels') return;
+                const key = draft.keyword.toLowerCase();
+                if (!keywordMap.has(key)) keywordMap.set(key, []);
+                keywordMap.get(key).push(draft);
+            });
+            if (!keywordMap.size) return;
+
+            const keywordList = [...keywordMap.keys()];
+            const pools = await Promise.all(keywordList.map(async (kw) => {
+                const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(kw)}&per_page=20`, {
+                    headers: { Authorization: apiKey }
+                });
+                if (!res.ok) throw new Error(`关键词 '${kw}' 请求失败 (${res.status})`);
+                const data = await res.json();
+                const videos = data.videos || [];
+                if (!videos.length) throw new Error(`未找到关键词 '${kw}' 的可用视频。`);
+                return [kw, videos];
+            }));
+
+            pools.forEach(([kw, videos]) => {
+                const usedIds = new Set();
+                const group = keywordMap.get(kw) || [];
+                group.forEach((draft) => {
+                    const picked = pickUniqueVideoByKeyword(videos, usedIds, targetW, targetH);
+                    if (!picked) {
+                        throw new Error(`关键词 '${kw}' 可用去重视频不足，请更换关键词或减少同词场景数。`);
+                    }
+                    draft.videoUrl = picked.videoUrl;
+                    draft.videoId = picked.videoId;
+                });
+            });
+        }
+
+        async function decodeSelectedBgmBuffers() {
+            const selected = getSelectedBgmEntries();
+            if (!selected.length) {
+                Engine.bgmBuffers = [];
+                return;
+            }
+
+            const decoded = await runWithLimit(selected, 2, async (entry) => {
+                if (entry.buffer) return entry.buffer;
+                try {
+                    const arr = await entry.file.arrayBuffer();
+                    entry.buffer = await Engine.audioCtx.decodeAudioData(arr.slice(0));
+                    return entry.buffer;
+                } catch (err) {
+                    console.warn('BGM 解码失败:', entry.name, err);
+                    return null;
+                }
+            });
+            Engine.bgmBuffers = decoded.filter(Boolean);
+        }
+
+        function stopBgmSources() {
+            Engine.activeBgmSources.forEach((node) => {
+                try { node.src.stop(); } catch (e) {}
+                try { node.src.disconnect(); } catch (e) {}
+                try { node.gain.disconnect(); } catch (e) {}
+            });
+            Engine.activeBgmSources = [];
+        }
+
+        function startBgmSources(dest) {
+            stopBgmSources();
+            if (!Engine.bgmBuffers.length || !Engine.audioCtx) return;
+            const volume = parseFloat(DOM.bgmVolume.value) || 0;
+            const trackCount = Math.max(1, Engine.bgmBuffers.length);
+            const perTrackVol = volume / Math.sqrt(trackCount);
+
+            Engine.activeBgmSources = Engine.bgmBuffers.map((buffer) => {
+                const src = Engine.audioCtx.createBufferSource();
+                const gain = Engine.audioCtx.createGain();
+                src.buffer = buffer;
+                src.loop = true;
+                gain.gain.value = perTrackVol;
+                src.connect(gain).connect(dest);
+                gain.connect(Engine.audioCtx.destination);
+                src.start(0);
+                return { src, gain };
+            });
+        }
+
+        function updateActionButtons() {
+            DOM.playRecordBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
+            DOM.downloadBtn.disabled = !Engine.mergedBlob || Engine.isBatchExporting || Engine.isPlaying;
+            DOM.downloadScenesBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
+        }
+
+        function triggerBlobDownload(blob, filenameBase) {
+            const outputType = blob && blob.type ? blob.type : 'video/webm';
+            const ext = outputType.includes('mp4') ? 'mp4' : 'webm';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${filenameBase}.${ext}`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1800);
+        }
+
+        DOM.generateBtn.onclick = async function () {
+            DOM.generateBtn.disabled = true;
+            DOM.playRecordBtn.disabled = true;
+            DOM.playRecordBtn.innerText = '第二步: 播放并录制';
+            DOM.downloadBtn.disabled = true;
+            DOM.downloadScenesBtn.disabled = true;
             Engine.scenes = [];
+            Engine.mergedBlob = null;
+            Engine.recordedChunks = [];
             clearPlaybackState();
             releaseObjectUrls();
             setStatus('资产解析中', 'busy');
 
             try {
-                log('正在初始化引擎并抓取资产...');
+                log('正在并行解析场景资产...');
+                await ensureAudioContextReady();
+                await decodeSelectedBgmBuffers();
 
-                if (!Engine.audioCtx) Engine.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (Engine.audioCtx.state === 'suspended') await Engine.audioCtx.resume();
-
-                const bgmFile = document.getElementById('bgmInput').files[0];
-                Engine.bgmBuffer = null;
-                if (bgmFile) {
-                    log('正在解码全局 BGM...');
-                    Engine.bgmBuffer = await Engine.audioCtx.decodeAudioData(await bgmFile.arrayBuffer());
+                const drafts = collectSceneDrafts();
+                const hasPexels = drafts.some(d => d.source === 'pexels');
+                if (hasPexels) {
+                    const key = pexelsInput.value.trim();
+                    if (!key) throw new Error('请先填写 Pexels API Key。');
+                    const [targetW, targetH] = getTargetResolution();
+                    await assignPexelsVideos(drafts, key, targetW, targetH);
                 }
 
-                const sceneCards = [...document.querySelectorAll('.scene-card')];
-                if (!sceneCards.length) throw new Error('请至少添加一个场景。');
+                const builtScenes = await runWithLimit(drafts, 4, async (draft, idx) => {
+                    log(`并行处理中 ${idx + 1}/${drafts.length}...`);
 
-                for (let idx = 0; idx < sceneCards.length; idx++) {
-                    const card = sceneCards[idx];
-                    const id = card.dataset.sceneId;
-                    log(`正在处理场景 ${idx + 1}/${sceneCards.length}...`);
-
-                    const source = document.getElementById(`source-${id}`).value;
-                    const text = document.getElementById(`text-${id}`).value.trim();
-                    const voiceId = document.getElementById(`voice-${id}`).value;
-                    let videoUrl = null;
-                    let audioBuffer = null;
-                    let ttsUrl = null;
-                    let ttsDuration = 0;
-
-                    if (source === 'pexels') {
-                        const key = pexelsInput.value.trim();
-                        if (!key) throw new Error('请先填写 Pexels API Key。');
-                        const kw = document.getElementById(`keyword-${id}`).value.trim();
-                        if (!kw) throw new Error(`场景 ${idx + 1} 请选择关键词。`);
-
-                        const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(kw)}&per_page=5`, {
-                            headers: { Authorization: key }
-                        });
-
-                        if (!res.ok) throw new Error(`场景 ${idx + 1} 的 Pexels 请求失败 (${res.status})。`);
-                        const data = await res.json();
-
-                        if (!data.videos || !data.videos.length) {
-                            throw new Error(`场景 ${idx + 1} 未找到关键词 '${kw}' 相关视频。`);
-                        }
-
-                        const files = data.videos[0].video_files || [];
-                        const picked = files.sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
-                        if (!picked || !picked.link) throw new Error(`场景 ${idx + 1} 视频地址无效。`);
-                        videoUrl = picked.link;
-                    } else {
-                        const file = document.getElementById(`file-${id}`).files[0];
-                        if (!file) throw new Error(`请为场景 ${idx + 1} 上传本地视频。`);
-                        videoUrl = URL.createObjectURL(file);
+                    let videoUrl = draft.videoUrl || null;
+                    if (draft.source === 'local') {
+                        videoUrl = URL.createObjectURL(draft.file);
                         Engine.objectUrls.push(videoUrl);
                     }
+                    if (!videoUrl) throw new Error(`场景 ${idx + 1} 未找到可用视频。`);
 
-                    if (text) {
-                        const ttsAsset = await fetchTTSAsset(text, voiceId);
-                        audioBuffer = ttsAsset.audioBuffer;
-                        ttsUrl = ttsAsset.audioUrl;
-                        ttsDuration = ttsAsset.duration || 0;
-                        if (!audioBuffer && !ttsUrl) {
-                            log(`场景 ${idx + 1} 配音获取失败，将仅使用视频原声。`, 'error');
-                        }
-                    }
+                    const ttsPromise = draft.text
+                        ? fetchTTSAsset(draft.text, draft.voiceId)
+                        : Promise.resolve({ audioBuffer: null, audioUrl: null, duration: 0 });
+                    const videoDurationPromise = getVideoDuration(videoUrl);
+                    const [ttsAsset, videoDurationRaw] = await Promise.all([ttsPromise, videoDurationPromise]);
 
-                    const videoDuration = await getVideoDuration(videoUrl);
-                    const customDuration = readCustomSceneDuration(id);
-                    const hasCustomDuration = customDuration > 0;
+                    const ttsDuration = ttsAsset.duration || 0;
+                    const videoDuration = Math.max(1, videoDurationRaw || 4);
                     const autoDuration = ttsDuration || videoDuration || 4;
-                    const duration = hasCustomDuration ? customDuration : autoDuration;
+                    const duration = draft.hasCustomDuration ? draft.customDuration : autoDuration;
 
-                    Engine.scenes.push({
-                        id,
+                    return {
+                        id: draft.id,
                         videoUrl,
-                        text,
-                        audioBuffer,
-                        ttsUrl,
-                        videoDuration: Math.max(1, videoDuration || 4),
+                        text: draft.text,
+                        audioBuffer: ttsAsset.audioBuffer,
+                        ttsUrl: ttsAsset.audioUrl,
+                        videoDuration,
                         duration: Math.max(0.5, duration || 4),
-                        hasCustomDuration
-                    });
-                }
+                        hasCustomDuration: draft.hasCustomDuration
+                    };
+                });
 
-                log('资产解析完成，可以开始录制。', 'success');
+                Engine.scenes = builtScenes;
+                log(`资产解析完成，共 ${Engine.scenes.length} 个场景。`, 'success');
                 setStatus('资产就绪', 'ok');
-                document.getElementById('playRecordBtn').disabled = false;
             } catch (err) {
                 console.error(err);
+                Engine.scenes = [];
+                Engine.mergedBlob = null;
                 log(`解析失败: ${err.message}`, 'error');
                 setStatus('解析失败', 'error');
                 alert(err.message || '资产解析失败，请检查输入后重试。');
             } finally {
-                btn.disabled = false;
+                DOM.generateBtn.disabled = false;
+                updateActionButtons();
             }
         };
 
-        document.getElementById('playRecordBtn').onclick = async function () {
+        DOM.playRecordBtn.onclick = async function () {
             if (!Engine.scenes.length) {
                 alert('请先执行第一步解析场景资产。');
                 return;
@@ -1532,53 +1810,42 @@
                 return;
             }
 
-            if (!Engine.audioCtx) Engine.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (Engine.audioCtx.state === 'suspended') await Engine.audioCtx.resume();
+            await ensureAudioContextReady();
 
             log('启动混流渲染管线...');
             setStatus('录制中', 'busy');
-            this.disabled = true;
-            this.innerText = '录制中...';
-            document.getElementById('downloadBtn').disabled = true;
+            DOM.playRecordBtn.disabled = true;
+            DOM.playRecordBtn.innerText = '录制中...';
+            DOM.downloadBtn.disabled = true;
+            DOM.downloadScenesBtn.disabled = true;
 
             Engine.isPlaying = true;
             Engine.currentIdx = 0;
             Engine.recordedChunks = [];
+            Engine.mergedBlob = null;
 
-            const [w, h] = document.getElementById('videoSize').value.split(',').map(Number);
+            const [w, h] = getTargetResolution();
             DOM.canvas.width = w;
             DOM.canvas.height = h;
 
             clearPlaybackState();
 
             const dest = Engine.audioCtx.createMediaStreamDestination();
-            let bgmSrc = null;
             try {
-                if (Engine.bgmBuffer) {
-                    bgmSrc = Engine.audioCtx.createBufferSource();
-                    bgmSrc.buffer = Engine.bgmBuffer;
-                    bgmSrc.loop = true;
-                    const gain = Engine.audioCtx.createGain();
-                    gain.gain.value = parseFloat(document.getElementById('bgmVolume').value);
-                    bgmSrc.connect(gain).connect(dest);
-                    gain.connect(Engine.audioCtx.destination);
-                    bgmSrc.start(0);
-                }
-
+                startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
                 const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
                 const mimeType = getPreferredMimeType();
                 Engine.mediaRecorder = mimeType ? new MediaRecorder(mixStream, { mimeType }) : new MediaRecorder(mixStream);
             } catch (err) {
                 console.error(err);
-                if (bgmSrc) {
-                    try { bgmSrc.stop(); } catch (e) {}
-                }
+                stopBgmSources();
                 Engine.isPlaying = false;
-                this.disabled = false;
-                this.innerText = '第二步: 播放并录制';
+                DOM.playRecordBtn.disabled = false;
+                DOM.playRecordBtn.innerText = '第二步: 播放并录制';
                 setStatus('录制失败', 'error');
                 log(`录制器初始化失败: ${err.message || err}`, 'error');
+                updateActionButtons();
                 return;
             }
 
@@ -1596,6 +1863,7 @@
 
             Engine.mediaRecorder.onstop = () => {
                 clearPlaybackState();
+                stopBgmSources();
                 Engine.isPlaying = false;
                 cancelAnimationFrame(Engine.animFrame);
                 DOM.player.pause();
@@ -1604,34 +1872,33 @@
                 DOM.player.style.display = 'none';
                 DOM.subtitle.innerText = '';
 
-                if (bgmSrc) {
-                    try { bgmSrc.stop(); } catch (e) {}
-                }
-
-                this.disabled = false;
-                this.innerText = '重新录制';
-                document.getElementById('downloadBtn').disabled = false;
+                DOM.playRecordBtn.disabled = false;
+                DOM.playRecordBtn.innerText = '重新录制';
                 if (Engine.recordedChunks.length > 0) {
-                    log('视频录制结束，点击下载保存。', 'success');
+                    Engine.mergedBlob = new Blob(Engine.recordedChunks, {
+                        type: (Engine.recordedChunks[0] && Engine.recordedChunks[0].type) || 'video/webm'
+                    });
+                    log('视频录制结束，可下载合并视频或分场景视频。', 'success');
                     setStatus('录制完成', 'ok');
                 } else {
+                    Engine.mergedBlob = null;
                     log('录制结束但未生成可下载数据，请重试。', 'error');
                     setStatus('录制无数据', 'error');
                 }
+                updateActionButtons();
             };
 
             try {
-                Engine.mediaRecorder.start(400);
+                Engine.mediaRecorder.start(300);
             } catch (err) {
                 console.error(err);
-                if (bgmSrc) {
-                    try { bgmSrc.stop(); } catch (e) {}
-                }
-                this.disabled = false;
-                this.innerText = '第二步: 播放并录制';
+                stopBgmSources();
+                DOM.playRecordBtn.disabled = false;
+                DOM.playRecordBtn.innerText = '第二步: 播放并录制';
                 Engine.isPlaying = false;
                 setStatus('录制失败', 'error');
                 log(`录制启动失败: ${err.message || err}`, 'error');
+                updateActionButtons();
                 return;
             }
             playNextScene(dest);
@@ -1660,6 +1927,7 @@
             applySubtitlePreviewStyle();
 
             let advanced = false;
+            let sceneStarted = false;
             const advance = () => {
                 if (advanced) return;
                 advanced = true;
@@ -1682,6 +1950,8 @@
             };
 
             DOM.player.oncanplay = async () => {
+                if (sceneStarted) return;
+                sceneStarted = true;
                 clearTimeout(loadWatchdog);
                 try { await DOM.player.play(); } catch (e) {}
 
@@ -1828,24 +2098,182 @@
             Engine.animFrame = requestAnimationFrame(renderLoop);
         }
 
-        document.getElementById('downloadBtn').onclick = () => {
-            if (!Engine.recordedChunks.length) {
-                alert('暂无可下载的视频，请先录制。');
+        function resetPreviewPlaybackState() {
+            DOM.player.pause();
+            DOM.player.loop = false;
+            DOM.player.removeAttribute('src');
+            DOM.player.load();
+            DOM.player.style.display = 'none';
+            DOM.subtitle.innerText = '';
+        }
+
+        async function recordSingleSceneBlob(scene, sceneIndex, totalScenes) {
+            if (typeof MediaRecorder === 'undefined') {
+                throw new Error('当前浏览器不支持 MediaRecorder。');
+            }
+            await ensureAudioContextReady();
+
+            clearPlaybackState();
+            stopBgmSources();
+            Engine.recordedChunks = [];
+            Engine.isPlaying = true;
+
+            const [w, h] = getTargetResolution();
+            DOM.canvas.width = w;
+            DOM.canvas.height = h;
+
+            const dest = Engine.audioCtx.createMediaStreamDestination();
+            startBgmSources(dest);
+            const vStream = DOM.canvas.captureStream(30);
+            const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+            const mimeType = getPreferredMimeType();
+            const recorder = mimeType ? new MediaRecorder(mixStream, { mimeType }) : new MediaRecorder(mixStream);
+
+            return await new Promise((resolve, reject) => {
+                let closed = false;
+                let started = false;
+                const closeWithError = (err) => {
+                    if (closed) return;
+                    closed = true;
+                    try {
+                        if (recorder.state !== 'inactive') recorder.stop();
+                    } catch (e) {}
+                    clearPlaybackState();
+                    stopBgmSources();
+                    Engine.isPlaying = false;
+                    cancelAnimationFrame(Engine.animFrame);
+                    resetPreviewPlaybackState();
+                    reject(err);
+                };
+
+                recorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) Engine.recordedChunks.push(e.data);
+                };
+                recorder.onerror = () => {
+                    closeWithError(new Error(`场景 ${sceneIndex + 1} 录制器异常。`));
+                };
+                recorder.onstop = () => {
+                    if (closed) return;
+                    closed = true;
+                    clearPlaybackState();
+                    stopBgmSources();
+                    Engine.isPlaying = false;
+                    cancelAnimationFrame(Engine.animFrame);
+                    resetPreviewPlaybackState();
+
+                    if (!Engine.recordedChunks.length) {
+                        reject(new Error(`场景 ${sceneIndex + 1} 未生成录制数据。`));
+                        return;
+                    }
+                    const outputType = (Engine.recordedChunks[0] && Engine.recordedChunks[0].type) || 'video/webm';
+                    resolve(new Blob(Engine.recordedChunks, { type: outputType }));
+                };
+
+                DOM.player.style.display = 'block';
+                DOM.player.loop = scene.duration > (scene.videoDuration || 0) + 0.05;
+                DOM.player.src = scene.videoUrl;
+                DOM.subtitle.innerText = scene.text || '';
+                applySubtitlePreviewStyle();
+
+                DOM.player.onerror = () => {
+                    closeWithError(new Error(`场景 ${sceneIndex + 1}/${totalScenes} 视频加载失败。`));
+                };
+                DOM.player.oncanplay = async () => {
+                    if (started) return;
+                    started = true;
+                    try {
+                        await DOM.player.play();
+                    } catch (err) {}
+
+                    if (scene.audioBuffer) {
+                        const voice = Engine.audioCtx.createBufferSource();
+                        voice.buffer = scene.audioBuffer;
+                        voice.connect(dest);
+                        voice.connect(Engine.audioCtx.destination);
+                        Engine.activeVoice = voice;
+                        try { voice.start(0); } catch (err) {}
+                    } else if (scene.ttsUrl) {
+                        const voiceEl = new Audio(scene.ttsUrl);
+                        voiceEl.preload = 'auto';
+                        voiceEl.crossOrigin = 'anonymous';
+                        voiceEl.playsInline = true;
+
+                        try {
+                            const voiceNode = Engine.audioCtx.createMediaElementSource(voiceEl);
+                            voiceNode.connect(dest);
+                            voiceNode.connect(Engine.audioCtx.destination);
+                            Engine.activeVoiceNode = voiceNode;
+                        } catch (err) {
+                            console.warn('分场景导出: TTS 节点创建失败。', err);
+                        }
+
+                        Engine.activeVoiceEl = voiceEl;
+                        voiceEl.onerror = () => closeWithError(new Error(`场景 ${sceneIndex + 1} 配音播放失败。`));
+                        try { await voiceEl.play(); } catch (err) {}
+                    }
+
+                    try {
+                        recorder.start(250);
+                    } catch (err) {
+                        closeWithError(new Error(`场景 ${sceneIndex + 1} 录制启动失败。`));
+                        return;
+                    }
+
+                    Engine.sceneTimer = setTimeout(() => {
+                        if (recorder.state !== 'inactive') recorder.stop();
+                    }, (scene.duration + 0.22) * 1000);
+                    renderLoop();
+                };
+            });
+        }
+
+        DOM.downloadBtn.onclick = () => {
+            if (!Engine.mergedBlob) {
+                alert('暂无可下载的合并视频，请先录制。');
                 return;
             }
+            triggerBlobDownload(Engine.mergedBlob, `AI全能矩阵视频_${Date.now()}`);
+            log('合并视频下载已触发。', 'success');
+        };
 
-            const outputType = Engine.recordedChunks[0] && Engine.recordedChunks[0].type
-                ? Engine.recordedChunks[0].type
-                : 'video/webm';
-            const ext = outputType.includes('mp4') ? 'mp4' : 'webm';
-            const blob = new Blob(Engine.recordedChunks, { type: outputType });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `AI全能矩阵视频_${Date.now()}.${ext}`;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1500);
-            log('下载已触发。', 'success');
+        DOM.downloadScenesBtn.onclick = async () => {
+            if (!Engine.scenes.length) {
+                alert('请先执行第一步解析场景资产。');
+                return;
+            }
+            if (Engine.isPlaying || Engine.isBatchExporting) return;
+
+            Engine.isBatchExporting = true;
+            DOM.generateBtn.disabled = true;
+            DOM.playRecordBtn.disabled = true;
+            DOM.downloadBtn.disabled = true;
+            DOM.downloadScenesBtn.disabled = true;
+            setStatus('分场景导出中', 'busy');
+
+            let successCount = 0;
+            try {
+                for (let i = 0; i < Engine.scenes.length; i++) {
+                    log(`正在导出场景 ${i + 1}/${Engine.scenes.length}...`);
+                    try {
+                        const blob = await recordSingleSceneBlob(Engine.scenes[i], i, Engine.scenes.length);
+                        triggerBlobDownload(blob, `AI场景_${String(i + 1).padStart(2, '0')}_${Date.now()}`);
+                        successCount += 1;
+                    } catch (sceneErr) {
+                        console.error(sceneErr);
+                        log(sceneErr.message || `场景 ${i + 1} 导出失败。`, 'error');
+                    }
+                }
+                if (successCount > 0) {
+                    log(`分场景导出完成，成功 ${successCount}/${Engine.scenes.length}。`, 'success');
+                    setStatus('分场景导出完成', 'ok');
+                } else {
+                    setStatus('分场景导出失败', 'error');
+                }
+            } finally {
+                Engine.isBatchExporting = false;
+                DOM.generateBtn.disabled = false;
+                updateActionButtons();
+            }
         };
 
         window.addEventListener('resize', () => {
@@ -1856,6 +2284,8 @@
         syncTextInspector();
         updateSceneCounter();
         updatePreviewRatio();
+        refreshBgmLibraryList();
+        updateActionButtons();
     </script>
 </body>
 </html>
