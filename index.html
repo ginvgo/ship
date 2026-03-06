@@ -9,6 +9,7 @@
             color-scheme: dark;
             --topbar-height: 62px;
             --workflow-height: 56px;
+            --worktop-offset: calc(var(--topbar-height) + var(--workflow-height) + var(--grid-gap) + 6px);
             --bg: #0a1222;
             --bg-elev: #0f1b30;
             --bg-soft: #152640;
@@ -350,29 +351,33 @@
         .app-grid {
             min-height: 0;
             display: grid;
-            grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.25fr) clamp(320px, 28vw, 430px);
-            grid-template-rows: minmax(410px, 0.96fr) minmax(360px, 1.04fr);
+            grid-template-columns: minmax(0, 1fr) clamp(420px, 42vw, 560px);
+            grid-template-rows: minmax(280px, 0.86fr) minmax(420px, 1.14fr);
             grid-template-areas:
-                "preview preview config"
-                "timeline timeline config";
+                "config preview"
+                "timeline preview";
             gap: var(--grid-gap);
             overflow: visible;
+            align-items: start;
         }
 
         .left-panel {
             grid-area: config;
-            position: sticky;
-            top: calc(var(--topbar-height) + var(--workflow-height) + var(--grid-gap) + 6px);
-            max-height: calc(100vh - var(--topbar-height) - var(--workflow-height) - (var(--grid-gap) * 3));
+            min-height: 280px;
         }
 
         .middle-panel {
             grid-area: timeline;
-            min-height: 360px;
+            min-height: 420px;
         }
 
         .right-panel {
             grid-area: preview;
+            position: sticky;
+            top: var(--worktop-offset);
+            max-height: calc(100vh - var(--worktop-offset) - var(--grid-gap));
+            overflow: auto;
+            overscroll-behavior: contain;
         }
 
         .panel {
@@ -708,14 +713,31 @@
             box-shadow: none;
         }
 
-        .right-panel {
-            overflow: auto;
+        .right-panel > h2 {
+            position: sticky;
+            top: 0;
+            z-index: 8;
+            background: var(--panel);
+            padding-top: 2px;
+        }
+
+        .right-panel .monitor-hints {
+            position: sticky;
+            top: 56px;
+            z-index: 7;
+            background: var(--panel);
+            padding-bottom: 3px;
         }
 
         .workspace-shell {
             flex: 0 0 auto;
             min-height: 0;
             display: flex;
+            position: sticky;
+            top: 96px;
+            z-index: 6;
+            background: var(--panel);
+            padding-bottom: 6px;
         }
 
         .workspace {
@@ -836,7 +858,7 @@
 
         .editor-lower {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+            grid-template-columns: 1fr;
             gap: 12px;
             align-items: start;
             flex: 0 0 auto;
@@ -856,6 +878,14 @@
             bottom: 0;
             z-index: 6;
             backdrop-filter: blur(6px);
+        }
+
+        .right-panel .toolbar-row {
+            order: 1;
+        }
+
+        .right-panel .text-inspector {
+            order: 2;
         }
 
         .action-row {
@@ -1017,12 +1047,8 @@
 
         @media (max-width: 1520px) {
             .app-grid {
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 340px;
-                grid-template-rows: minmax(380px, 0.9fr) minmax(340px, 1.1fr);
-            }
-
-            .editor-lower {
-                grid-template-columns: 1fr;
+                grid-template-columns: minmax(0, 1fr) clamp(390px, 43vw, 500px);
+                grid-template-rows: minmax(260px, 0.82fr) minmax(380px, 1.18fr);
             }
         }
 
@@ -1051,15 +1077,35 @@
                 grid-template-columns: 1fr;
                 grid-template-rows: auto;
                 grid-template-areas:
+                    "preview"
                     "config"
-                    "timeline"
-                    "preview";
+                    "timeline";
                 overflow: visible;
             }
 
             .left-panel {
                 position: static;
                 max-height: none;
+            }
+
+            .middle-panel,
+            .right-panel {
+                min-height: auto;
+            }
+
+            .right-panel {
+                position: static;
+                top: auto;
+                max-height: none;
+                overflow: visible;
+            }
+
+            .right-panel > h2,
+            .right-panel .monitor-hints,
+            .workspace-shell,
+            .toolbar-row {
+                position: static;
+                top: auto;
             }
 
             .panel {
