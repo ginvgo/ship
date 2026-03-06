@@ -6,81 +6,163 @@
     <title>全能 AI 视频合成工作站 (Pexels + 拖拽文本 + 混流引擎)</title>
     <style>
         :root {
-            --bg: #0a0615;
-            --bg-soft: #140b2a;
-            --panel: rgba(19, 12, 36, 0.84);
-            --panel-border: rgba(129, 75, 255, 0.34);
-            --panel-hover: rgba(146, 95, 255, 0.5);
-            --text: #ece8ff;
-            --text-soft: #b9afd6;
-            --primary: #8b35ff;
-            --primary-strong: #a44bff;
-            --accent: #18d9c7;
-            --danger: #ff4f8b;
-            --success: #2fd487;
-            --shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+            color-scheme: dark;
+            --bg: #0a1222;
+            --bg-elev: #0f1b30;
+            --bg-soft: #152640;
+            --bg-glow-1: rgba(34, 198, 255, 0.2);
+            --bg-glow-2: rgba(111, 236, 176, 0.16);
+            --panel: rgba(16, 27, 46, 0.88);
+            --panel-border: rgba(130, 157, 198, 0.3);
+            --panel-hover: rgba(76, 197, 255, 0.5);
+            --text: #eaf3ff;
+            --text-soft: #98abca;
+            --text-strong: #ffffff;
+            --primary: #2da9ff;
+            --primary-strong: #148ae8;
+            --accent: #4ce2c8;
+            --danger: #ff6d7c;
+            --success: #2ad49d;
+            --surface-input: rgba(8, 15, 28, 0.76);
+            --surface-subtle: rgba(22, 36, 60, 0.74);
+            --surface-muted: rgba(15, 27, 47, 0.52);
+            --shadow: 0 20px 40px rgba(0, 0, 0, 0.32);
             --grid-gap: 14px;
+            --status-idle-border: rgba(148, 166, 201, 0.46);
+            --status-idle-bg: rgba(26, 39, 60, 0.52);
+            --status-idle-text: #c9daee;
+            --status-busy-border: rgba(255, 173, 90, 0.55);
+            --status-busy-bg: rgba(96, 54, 11, 0.42);
+            --status-busy-text: #ffd39c;
+            --status-ok-border: rgba(78, 214, 170, 0.52);
+            --status-ok-bg: rgba(16, 73, 59, 0.42);
+            --status-ok-text: #9af4cf;
+            --status-error-border: rgba(255, 126, 154, 0.55);
+            --status-error-bg: rgba(95, 27, 45, 0.44);
+            --status-error-text: #ffb0c4;
+        }
+
+        body[data-theme="light"] {
+            color-scheme: light;
+            --bg: #ecf4ff;
+            --bg-elev: #f8fbff;
+            --bg-soft: #dde9f8;
+            --bg-glow-1: rgba(44, 156, 255, 0.17);
+            --bg-glow-2: rgba(59, 194, 170, 0.16);
+            --panel: rgba(255, 255, 255, 0.92);
+            --panel-border: rgba(105, 128, 168, 0.22);
+            --panel-hover: rgba(45, 169, 255, 0.35);
+            --text: #1d2d44;
+            --text-soft: #5f7597;
+            --text-strong: #0f1d32;
+            --primary: #007fe0;
+            --primary-strong: #0063b1;
+            --accent: #00a98b;
+            --danger: #df465d;
+            --success: #109a72;
+            --surface-input: rgba(240, 246, 255, 0.95);
+            --surface-subtle: rgba(228, 238, 252, 0.9);
+            --surface-muted: rgba(232, 241, 255, 0.85);
+            --shadow: 0 18px 36px rgba(44, 80, 124, 0.14);
+            --status-idle-border: rgba(116, 139, 175, 0.42);
+            --status-idle-bg: rgba(232, 240, 253, 0.92);
+            --status-idle-text: #4f6485;
+            --status-busy-border: rgba(224, 153, 67, 0.52);
+            --status-busy-bg: rgba(255, 236, 212, 0.92);
+            --status-busy-text: #9c6200;
+            --status-ok-border: rgba(42, 184, 140, 0.46);
+            --status-ok-bg: rgba(221, 247, 240, 0.95);
+            --status-ok-text: #0b7e62;
+            --status-error-border: rgba(227, 88, 116, 0.48);
+            --status-error-bg: rgba(255, 230, 236, 0.95);
+            --status-error-text: #c02f4e;
         }
 
         * {
             box-sizing: border-box;
         }
 
+        *::-webkit-scrollbar {
+            width: 9px;
+            height: 9px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            border-radius: 999px;
+            background: rgba(121, 154, 201, 0.4);
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        body[data-theme="light"] *::-webkit-scrollbar-thumb {
+            background: rgba(97, 129, 175, 0.4);
+            background-clip: content-box;
+        }
+
         body {
             margin: 0;
             min-height: 100vh;
             color: var(--text);
-            font-family: "Rajdhani", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            font-family: "Space Grotesk", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
             background:
-                radial-gradient(1200px 600px at 15% -15%, rgba(168, 64, 255, 0.18), transparent 55%),
-                radial-gradient(1000px 700px at 100% 10%, rgba(24, 217, 199, 0.12), transparent 48%),
-                linear-gradient(145deg, #090512 0%, #0d0720 46%, #090512 100%);
+                radial-gradient(1200px 620px at 8% -10%, var(--bg-glow-1), transparent 54%),
+                radial-gradient(1100px 800px at 100% 2%, var(--bg-glow-2), transparent 48%),
+                linear-gradient(145deg, var(--bg) 0%, var(--bg-elev) 100%);
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
-            overflow-y: auto;
+            overflow: hidden;
         }
 
         .studio-topbar {
-            height: 62px;
+            min-height: 62px;
             padding: 10px 18px;
-            border-bottom: 1px solid rgba(128, 70, 255, 0.28);
+            border-bottom: 1px solid var(--panel-border);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: rgba(12, 7, 24, 0.88);
-            backdrop-filter: blur(8px);
+            gap: 12px;
+            background: color-mix(in srgb, var(--bg-elev) 84%, transparent);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 30;
         }
 
         .brand {
             display: flex;
             align-items: center;
             gap: 12px;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.2px;
         }
 
         .brand-badge {
-            width: 30px;
-            height: 30px;
-            border-radius: 9px;
-            background: linear-gradient(135deg, #7e34ff, #bb3fff);
-            box-shadow: 0 0 16px rgba(156, 64, 255, 0.58);
+            width: 34px;
+            height: 34px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, var(--primary), #4fcbff);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 8px 18px rgba(33, 133, 209, 0.45);
             display: grid;
             place-items: center;
             font-weight: 700;
             color: #fff;
+            font-size: 12px;
         }
 
         .brand h1 {
             margin: 0;
             font-size: 20px;
             font-weight: 700;
+            color: var(--text-strong);
         }
 
         .brand small {
             color: var(--text-soft);
-            font-size: 13px;
-            margin-left: 8px;
+            font-size: 12px;
+            margin-left: 6px;
         }
 
         .top-right {
@@ -88,38 +170,129 @@
             align-items: center;
             gap: 10px;
             color: var(--text-soft);
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .status-pill {
-            padding: 5px 10px;
+            padding: 6px 11px;
             border-radius: 999px;
-            border: 1px solid rgba(83, 215, 168, 0.45);
-            color: #8fffd4;
-            background: rgba(14, 57, 48, 0.42);
+            border: 1px solid var(--status-idle-border);
+            color: var(--status-idle-text);
+            background: var(--status-idle-bg);
+            white-space: nowrap;
         }
 
-        .app-grid {
+        .theme-toggle {
+            border-radius: 999px;
+            border: 1px solid var(--panel-border);
+            background: var(--surface-subtle);
+            color: var(--text);
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            min-width: 98px;
+        }
+
+        .theme-toggle:hover:not(:disabled) {
+            border-color: var(--panel-hover);
+            background: color-mix(in srgb, var(--surface-subtle) 78%, var(--primary));
+        }
+
+        .studio-shell {
             flex: 1;
             min-height: 0;
             padding: var(--grid-gap);
             display: grid;
-            grid-template-columns: 320px minmax(360px, 1fr) minmax(520px, 40vw);
+            grid-template-columns: 72px minmax(0, 1fr);
             gap: var(--grid-gap);
-            overflow: visible;
+            overflow: hidden;
+        }
+
+        .tool-rail {
+            border-radius: 16px;
+            border: 1px solid var(--panel-border);
+            background: color-mix(in srgb, var(--panel) 92%, transparent);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 8px;
+            overflow: auto;
+        }
+
+        .rail-item {
+            width: 100%;
+            min-height: 62px;
+            border-radius: 11px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-soft);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 6px 4px;
+        }
+
+        .rail-item:hover {
+            color: var(--text);
+            border-color: var(--panel-hover);
+            background: color-mix(in srgb, var(--surface-muted) 90%, transparent);
+        }
+
+        .rail-item.active {
+            color: #fff;
+            background: linear-gradient(135deg, var(--primary), #3db6ff);
+            border-color: rgba(255, 255, 255, 0.35);
+            box-shadow: 0 10px 20px rgba(33, 133, 209, 0.34);
+        }
+
+        .rail-icon {
+            font-size: 17px;
+            line-height: 1;
+        }
+
+        .app-grid {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) clamp(320px, 30vw, 430px);
+            grid-template-rows: minmax(460px, 1fr) minmax(240px, 34vh);
+            grid-template-areas:
+                "preview config"
+                "timeline config";
+            gap: var(--grid-gap);
+            overflow: hidden;
+        }
+
+        .left-panel {
+            grid-area: config;
+        }
+
+        .middle-panel {
+            grid-area: timeline;
+        }
+
+        .right-panel {
+            grid-area: preview;
         }
 
         .panel {
             background: var(--panel);
             border: 1px solid var(--panel-border);
-            border-radius: 14px;
+            border-radius: 16px;
             padding: 14px;
             box-shadow: var(--shadow);
             display: flex;
             flex-direction: column;
             gap: 12px;
-            overflow-y: auto;
             min-height: 0;
+            overflow: auto;
         }
 
         .panel:hover {
@@ -130,14 +303,15 @@
         h3 {
             margin: 0;
             font-size: 15px;
-            letter-spacing: 0.4px;
-            color: #fff;
-            border-bottom: 1px solid rgba(102, 64, 188, 0.5);
-            padding-bottom: 9px;
+            letter-spacing: 0.2px;
+            color: var(--text-strong);
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .panel-headline {
@@ -147,22 +321,41 @@
         .panel-title-wrap {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 4px;
         }
 
         .panel-subtitle {
             font-size: 11px;
-            color: #aa98d6;
-            font-weight: 500;
+            color: var(--text-soft);
+            font-weight: 600;
             letter-spacing: 0.2px;
+        }
+
+        .panel-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            background: var(--surface-subtle);
+        }
+
+        .panel-section > h3 {
+            font-size: 13px;
+            padding-bottom: 8px;
         }
 
         .ctrl-group {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 6px;
             font-size: 12px;
             color: var(--text-soft);
+        }
+
+        label {
+            color: inherit;
         }
 
         .row {
@@ -179,31 +372,32 @@
         select,
         textarea {
             width: 100%;
-            border-radius: 8px;
-            border: 1px solid rgba(111, 79, 196, 0.66);
-            background: rgba(9, 6, 19, 0.93);
-            color: #f3f1ff;
-            padding: 9px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--panel-border);
+            background: var(--surface-input);
+            color: var(--text);
+            padding: 9px 11px;
             font-size: 13px;
             outline: none;
-            transition: border-color 0.15s, box-shadow 0.15s;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
         }
 
         input:focus,
         select:focus,
         textarea:focus {
-            border-color: rgba(164, 78, 255, 0.95);
-            box-shadow: 0 0 0 2px rgba(139, 53, 255, 0.22);
+            border-color: color-mix(in srgb, var(--primary) 72%, white);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent);
+            background: color-mix(in srgb, var(--surface-input) 88%, var(--bg-elev));
         }
 
         textarea {
             resize: vertical;
-            min-height: 58px;
+            min-height: 62px;
         }
 
         input[type="color"] {
-            padding: 3px;
-            height: 38px;
+            padding: 2px;
+            height: 39px;
         }
 
         .hex-input {
@@ -220,58 +414,71 @@
         .color-preset-btn {
             width: 24px;
             height: 24px;
-            border-radius: 7px;
-            border: 1px solid rgba(255, 255, 255, 0.42);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
             padding: 0;
             min-width: 24px;
             min-height: 24px;
-            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
         }
 
         .color-preset-btn:hover:not(:disabled) {
-            transform: translateY(-1px) scale(1.03);
+            transform: translateY(-1px) scale(1.02);
         }
 
         button {
             border: none;
-            border-radius: 9px;
+            border-radius: 10px;
             padding: 10px 12px;
             font-size: 13px;
             font-weight: 700;
             color: #fff;
             cursor: pointer;
-            transition: transform 0.15s, filter 0.15s, opacity 0.15s;
-            background: linear-gradient(135deg, #6728dd, #8f34ff);
+            transition: transform 0.15s, filter 0.15s, opacity 0.15s, box-shadow 0.15s;
+            background: linear-gradient(135deg, var(--primary-strong), var(--primary));
+            box-shadow: 0 8px 18px rgba(16, 126, 208, 0.34);
         }
 
         button:hover:not(:disabled) {
             transform: translateY(-1px);
-            filter: brightness(1.1);
+            filter: brightness(1.08);
         }
 
         button:disabled {
-            opacity: 0.45;
+            opacity: 0.5;
             cursor: not-allowed;
+            box-shadow: none;
         }
 
         .btn-green {
-            background: linear-gradient(135deg, #08b99b, #11d48b);
+            background: linear-gradient(135deg, #11a47f, #2bd7a7);
+            box-shadow: 0 8px 18px rgba(17, 153, 116, 0.34);
         }
 
         .btn-red {
-            background: linear-gradient(135deg, #e53f7f, #ff5d66);
+            background: linear-gradient(135deg, #ce3e59, #ef5770);
+            box-shadow: 0 8px 18px rgba(179, 50, 77, 0.34);
+        }
+
+        .btn-compact {
+            padding: 7px 10px;
+            min-height: 34px;
+        }
+
+        .btn-tall {
+            height: 42px;
         }
 
         .scene-card {
-            background: linear-gradient(170deg, rgba(38, 21, 73, 0.92), rgba(23, 14, 45, 0.93));
-            border: 1px solid rgba(130, 86, 214, 0.48);
+            background: linear-gradient(170deg, color-mix(in srgb, var(--surface-subtle) 82%, transparent), color-mix(in srgb, var(--surface-muted) 88%, transparent));
+            border: 1px solid var(--panel-border);
             border-left: 3px solid var(--primary);
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 12px;
             display: flex;
             flex-direction: column;
             gap: 8px;
-            animation: cardIn 0.24s ease;
+            animation: cardIn 0.22s ease;
         }
 
         .scene-meta-grid {
@@ -294,28 +501,29 @@
         .chip-btn {
             flex: 0 0 auto;
             border-radius: 999px;
-            border: 1px solid rgba(145, 105, 236, 0.58);
+            border: 1px solid var(--panel-border);
             padding: 7px 11px;
             font-size: 11px;
             font-weight: 700;
-            background: rgba(75, 39, 151, 0.55);
-            color: #e7d6ff;
+            background: var(--surface-muted);
+            color: var(--text);
             cursor: pointer;
+            box-shadow: none;
         }
 
         .chip-btn:hover {
-            filter: brightness(1.12);
+            border-color: var(--panel-hover);
         }
 
         .duration-hint {
             font-size: 11px;
-            color: #8f83b5;
+            color: var(--text-soft);
         }
 
         .bgm-library {
-            border: 1px solid rgba(107, 70, 199, 0.5);
+            border: 1px solid var(--panel-border);
             border-radius: 10px;
-            background: rgba(13, 8, 26, 0.76);
+            background: var(--surface-muted);
             padding: 9px;
             display: flex;
             flex-direction: column;
@@ -340,7 +548,7 @@
 
         .bgm-hint {
             font-size: 11px;
-            color: #9183bc;
+            color: var(--text-soft);
         }
 
         @keyframes cardIn {
@@ -358,34 +566,52 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            color: #c9b3ff;
+            color: var(--text);
             font-weight: 700;
             font-size: 14px;
         }
 
         .scene-remove {
             background: transparent;
-            border: 1px solid rgba(255, 102, 162, 0.5);
-            color: #ff8bb6;
+            border: 1px solid color-mix(in srgb, var(--danger) 65%, transparent);
+            color: color-mix(in srgb, var(--danger) 78%, white);
             padding: 3px 8px;
-            border-radius: 7px;
+            border-radius: 8px;
             font-size: 12px;
+            box-shadow: none;
+        }
+
+        .right-panel {
+            overflow: hidden;
+        }
+
+        .workspace-shell {
+            flex: 1;
+            min-height: 0;
+            display: flex;
         }
 
         .workspace {
-            flex: 0 0 clamp(360px, 68vh, 900px);
-            min-height: 360px;
-            max-height: 900px;
+            flex: 1;
+            min-height: clamp(260px, 42vh, 560px);
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
+            border-radius: 12px;
             background:
-                radial-gradient(500px 240px at 70% 10%, rgba(132, 49, 255, 0.14), transparent 60%),
-                #05070f;
-            border: 1px solid rgba(99, 64, 184, 0.62);
+                radial-gradient(500px 260px at 72% 8%, rgba(47, 152, 230, 0.18), transparent 58%),
+                radial-gradient(580px 280px at 20% 100%, rgba(66, 211, 191, 0.14), transparent 62%),
+                #050c1b;
+            border: 1px solid var(--panel-border);
             overflow: auto;
             padding: 10px;
+        }
+
+        body[data-theme="light"] .workspace {
+            background:
+                radial-gradient(500px 260px at 72% 8%, rgba(37, 153, 236, 0.2), transparent 58%),
+                radial-gradient(580px 280px at 20% 100%, rgba(44, 194, 175, 0.14), transparent 62%),
+                #cfdced;
         }
 
         .preview-box {
@@ -395,11 +621,15 @@
             max-width: 100%;
             max-height: 100%;
             aspect-ratio: 16/9;
-            border-radius: 10px;
-            background: #0f1222;
+            border-radius: 12px;
+            background: #09101e;
             overflow: hidden;
             flex-shrink: 0;
-            box-shadow: inset 0 0 0 1px rgba(143, 88, 255, 0.28), 0 16px 40px rgba(1, 0, 5, 0.6);
+            box-shadow: inset 0 0 0 1px rgba(140, 178, 224, 0.35), 0 14px 32px rgba(0, 0, 0, 0.44);
+        }
+
+        body[data-theme="light"] .preview-box {
+            background: #14263e;
         }
 
         .preview-media {
@@ -437,7 +667,7 @@
             white-space: nowrap;
             padding: 4px 12px 10px 6px;
             border: 1px dashed transparent;
-            border-radius: 6px;
+            border-radius: 7px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
             font-weight: 700;
             touch-action: none;
@@ -454,8 +684,8 @@
             bottom: 2px;
             width: 9px;
             height: 9px;
-            border-right: 2px solid rgba(230, 220, 255, 0.9);
-            border-bottom: 2px solid rgba(230, 220, 255, 0.9);
+            border-right: 2px solid rgba(230, 244, 255, 0.92);
+            border-bottom: 2px solid rgba(230, 244, 255, 0.92);
             border-radius: 1px;
             cursor: nwse-resize;
             opacity: 0.85;
@@ -463,20 +693,30 @@
         }
 
         .draggable-text.active .text-resize-handle {
-            border-right-color: #be92ff;
-            border-bottom-color: #be92ff;
+            border-right-color: #8fd7ff;
+            border-bottom-color: #8fd7ff;
         }
 
         .draggable-text:hover {
-            border-color: rgba(219, 196, 255, 0.75);
+            border-color: rgba(209, 230, 255, 0.72);
         }
 
         .draggable-text.active {
-            border-color: #9a57ff;
-            background: rgba(134, 58, 255, 0.25);
+            border-color: #6dbfff;
+            background: rgba(45, 169, 255, 0.2);
+        }
+
+        .editor-lower {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(240px, 300px);
+            gap: 12px;
         }
 
         .toolbar-row {
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 10px;
+            background: var(--surface-subtle);
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -490,17 +730,17 @@
         .status-log {
             font-size: 12px;
             text-align: center;
-            color: #a6f2d2;
-            border-top: 1px solid rgba(108, 72, 199, 0.48);
+            color: var(--success);
+            border-top: 1px solid var(--panel-border);
             padding-top: 8px;
             min-height: 20px;
         }
 
         .text-inspector {
-            border: 1px solid rgba(107, 70, 199, 0.55);
-            border-radius: 10px;
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
             padding: 10px;
-            background: rgba(12, 7, 24, 0.66);
+            background: var(--surface-subtle);
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -509,7 +749,7 @@
         .inspector-title {
             font-size: 12px;
             font-weight: 700;
-            color: #d8c9ff;
+            color: var(--text);
         }
 
         #scenesContainer {
@@ -517,15 +757,16 @@
             flex-direction: column;
             gap: 10px;
             overflow-y: auto;
+            min-height: 0;
             padding-right: 3px;
         }
 
         .timeline-overview {
             margin-top: 4px;
-            border: 1px solid rgba(99, 64, 184, 0.48);
-            border-radius: 11px;
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
             padding: 10px;
-            background: linear-gradient(180deg, rgba(16, 10, 33, 0.92), rgba(10, 8, 24, 0.88));
+            background: var(--surface-subtle);
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -536,31 +777,31 @@
             justify-content: space-between;
             align-items: center;
             font-size: 12px;
-            color: #d8c9ff;
+            color: var(--text);
             font-weight: 700;
         }
 
         .timeline-track {
             display: flex;
             gap: 6px;
-            min-height: 32px;
-            border: 1px dashed rgba(131, 95, 220, 0.42);
+            min-height: 34px;
+            border: 1px dashed var(--panel-border);
             border-radius: 9px;
             padding: 6px;
-            background: rgba(12, 8, 26, 0.8);
+            background: var(--surface-muted);
             overflow-x: auto;
             overflow-y: hidden;
         }
 
         .timeline-segment {
             min-width: 44px;
-            border-radius: 6px;
-            background: linear-gradient(135deg, rgba(115, 47, 233, 0.78), rgba(67, 34, 149, 0.76));
-            border: 1px solid rgba(189, 153, 255, 0.35);
+            border-radius: 7px;
+            background: linear-gradient(135deg, rgba(56, 166, 236, 0.86), rgba(20, 105, 184, 0.82));
+            border: 1px solid rgba(164, 214, 255, 0.44);
             display: grid;
             place-items: center;
             font-size: 11px;
-            color: #f0e6ff;
+            color: #f0f7ff;
             white-space: nowrap;
             padding: 0 8px;
         }
@@ -569,54 +810,57 @@
             width: 100%;
             display: grid;
             place-items: center;
-            color: #7f71a8;
+            color: var(--text-soft);
             font-size: 11px;
         }
 
         .timeline-tips {
             font-size: 11px;
-            color: #9183bc;
+            color: var(--text-soft);
         }
 
         canvas {
             display: none;
         }
 
-        @media (max-width: 1300px) {
+        @media (max-width: 1520px) {
             .app-grid {
-                grid-template-columns: 300px 1fr;
-                grid-template-areas:
-                    "left right"
-                    "middle right";
+                grid-template-columns: minmax(0, 1fr) 360px;
             }
 
-            .workspace {
-                flex-basis: clamp(320px, 62vh, 760px);
-                min-height: 320px;
-                max-height: 760px;
+            .editor-lower {
+                grid-template-columns: 1fr;
             }
-
-            .left-panel { grid-area: left; }
-            .middle-panel { grid-area: middle; }
-            .right-panel { grid-area: right; }
         }
 
-        @media (max-width: 980px) {
+        @media (max-width: 1250px) {
             body {
                 overflow: auto;
             }
 
-            .studio-topbar {
-                flex-wrap: wrap;
-                height: auto;
-                gap: 8px;
+            .studio-shell {
+                grid-template-columns: 58px minmax(0, 1fr);
+                overflow: visible;
+            }
+
+            .tool-rail {
+                gap: 6px;
+                padding: 10px 6px;
+            }
+
+            .rail-item {
+                min-height: 54px;
+                font-size: 9px;
             }
 
             .app-grid {
-                height: auto;
                 min-height: auto;
                 grid-template-columns: 1fr;
-                grid-template-areas: none;
+                grid-template-rows: auto;
+                grid-template-areas:
+                    "preview"
+                    "config"
+                    "timeline";
                 overflow: visible;
             }
 
@@ -625,11 +869,51 @@
             }
 
             .workspace {
-                min-height: 220px;
+                min-height: 280px;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .studio-topbar {
+                flex-wrap: wrap;
+                gap: 8px;
+                min-height: auto;
             }
 
-            .scene-meta-grid {
+            .top-right {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+
+            .studio-shell {
                 grid-template-columns: 1fr;
+                overflow: visible;
+            }
+
+            .tool-rail {
+                flex-direction: row;
+                justify-content: flex-start;
+                align-items: stretch;
+                padding: 8px;
+                gap: 8px;
+                overflow-x: auto;
+            }
+
+            .rail-item {
+                min-width: 78px;
+                min-height: 54px;
+            }
+
+            .scene-meta-grid,
+            .row,
+            .action-row {
+                grid-template-columns: 1fr;
+                flex-direction: column;
+            }
+
+            .workspace {
+                min-height: 220px;
             }
         }
     </style>
@@ -640,180 +924,219 @@
             <div class="brand-badge">AI</div>
             <div>
                 <h1>AI Studio</h1>
-                <small>全能视频合成工作站</small>
+                <small>视频合成工作站 · 生产版布局</small>
             </div>
         </div>
         <div class="top-right">
             <span id="sceneCounter">场景: 1</span>
             <span class="status-pill">状态: 待命</span>
+            <button type="button" id="themeToggleBtn" class="theme-toggle" aria-label="切换亮暗主题">切换明亮</button>
         </div>
     </header>
 
-    <div class="app-grid">
-        <div class="panel left-panel">
-            <h2>全局设置 & API</h2>
+    <div class="studio-shell">
+        <aside class="tool-rail" aria-label="功能导航">
+            <button class="rail-item active" type="button" onclick="document.querySelector('.right-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+                <span class="rail-icon">▦</span>
+                <span>Media</span>
+            </button>
+            <button class="rail-item" type="button" onclick="document.querySelector('.middle-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+                <span class="rail-icon">◫</span>
+                <span>Scenes</span>
+            </button>
+            <button class="rail-item" type="button" onclick="document.querySelector('.left-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+                <span class="rail-icon">⚙</span>
+                <span>Config</span>
+            </button>
+            <button class="rail-item" type="button" onclick="document.querySelector('.text-inspector').scrollIntoView({ behavior: 'smooth', block: 'nearest' })">
+                <span class="rail-icon">T</span>
+                <span>Text</span>
+            </button>
+            <button class="rail-item" type="button" onclick="document.getElementById('bgmInput').focus()">
+                <span class="rail-icon">♪</span>
+                <span>Music</span>
+            </button>
+            <button class="rail-item" type="button" onclick="document.getElementById('generateBtn').scrollIntoView({ behavior: 'smooth', block: 'center' })">
+                <span class="rail-icon">▶</span>
+                <span>Export</span>
+            </button>
+        </aside>
 
-            <div class="ctrl-group">
-                <label style="color:var(--accent)">Pexels API Key (必填)</label>
-                <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
-            </div>
-
-            <div class="ctrl-group">
-                <label>视频导出尺寸</label>
-                <select id="videoSize" onchange="updatePreviewRatio()">
-                    <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
-                    <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
-                    <option value="1080,1080">1:1 正方形 (1080x1080)</option>
-                    <option value="1200,900">4:3 传统横屏 (1200x900)</option>
-                    <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
-                </select>
-            </div>
-
-            <div class="ctrl-group">
-                <label>背景音乐库 (可多选)</label>
-                <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
-                <div class="bgm-library">
-                    <select id="bgmLibraryList" class="bgm-list" multiple></select>
-                    <div class="bgm-actions">
-                        <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
-                        <button type="button" id="clearBgmBtn">清空音乐库</button>
+        <div class="app-grid">
+            <div class="panel right-panel">
+                <h2>
+                    可视化监视器
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="addTextBox()" class="btn-compact">+ 自由文本</button>
+                        <button onclick="deleteActiveTextBox()" class="btn-red btn-compact">删文本</button>
                     </div>
-                    <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
-                </div>
-                <label>音量调节: <span id="bgmVolVal">15%</span></label>
-                <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
-            </div>
+                </h2>
 
-            <h2>主字幕样式 (底部旁白)</h2>
-            <div class="ctrl-group">
-                <label>字体库</label>
-                <select id="fontFamily">
-                    <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
-                    <option value="SimHei, sans-serif">黑体</option>
-                    <option value="KaiTi, serif">楷体</option>
-                </select>
-            </div>
-            <div class="row">
-                <div class="ctrl-group">
-                    <label>字号大小</label>
-                    <input type="number" id="fontSize" value="55" min="16" max="150">
+                <div class="workspace-shell">
+                    <div class="workspace">
+                        <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
+                            <video id="mediaPlayer" class="preview-media" muted playsinline></video>
+                            <div id="mainSubtitle"></div>
+                            <div id="textLayer"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="ctrl-group">
-                    <label>字体颜色</label>
-                    <input type="color" id="fontColor" value="#ffffff">
-                </div>
-            </div>
-            <div class="ctrl-group">
-                <label>字体 HEX 颜色值</label>
-                <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
-            </div>
-            <div class="ctrl-group">
-                <label>常用字幕颜色</label>
-                <div id="fontColorPresetBar" class="color-presets"></div>
-            </div>
-            <div class="ctrl-group">
-                <label>字幕样式预设</label>
-                <select id="subtitleStylePreset">
-                    <option value="classic">经典白字</option>
-                    <option value="film">电影黄字</option>
-                    <option value="neon">霓虹青字</option>
-                    <option value="warning">警示红字</option>
-                </select>
-            </div>
-        </div>
 
-        <div class="panel middle-panel">
-            <h2 class="panel-headline">
-                <div class="panel-title-wrap">
-                    <span>场景编排轨道</span>
-                    <span class="panel-subtitle" id="sceneDurationSummary">总时长预估: 00:00</span>
-                </div>
-                <button onclick="addScene()" class="btn-green" style="padding:6px 10px;">+ 添加场景</button>
-            </h2>
-            <div id="scenesContainer"></div>
-            <div class="timeline-overview">
-                <div class="timeline-head">
-                    <span>时间轴预览</span>
-                    <span id="timelineTotal">00:00</span>
-                </div>
-                <div id="timelineTrack" class="timeline-track"></div>
-                <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
-            </div>
-        </div>
+                <div class="editor-lower">
+                    <div class="text-inspector">
+                        <div class="inspector-title">自由文本属性 (选中后可编辑)</div>
+                        <div class="ctrl-group">
+                            <label>内容</label>
+                            <input id="textEditContent" type="text" placeholder="先在预览区点击一个文本" disabled>
+                        </div>
+                        <div class="row">
+                            <div class="ctrl-group">
+                                <label>颜色</label>
+                                <input id="textEditColor" type="color" value="#ffffff" disabled>
+                            </div>
+                            <div class="ctrl-group">
+                                <label>字号</label>
+                                <input id="textEditSize" type="number" value="24" min="12" max="300" disabled>
+                            </div>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>HEX 颜色值</label>
+                            <input id="textEditHex" class="hex-input" type="text" value="#ffffff" placeholder="#RRGGBB" disabled>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>常用文字颜色</label>
+                            <div id="textColorPresetBar" class="color-presets"></div>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>文字样式预设</label>
+                            <select id="textStylePreset" disabled>
+                                <option value="custom">自定义</option>
+                                <option value="title">标题白字</option>
+                                <option value="gold">电商金字</option>
+                                <option value="neon">科技青字</option>
+                                <option value="alert">警示红字</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="ctrl-group">
+                                <label>X (%)</label>
+                                <input id="textEditX" type="number" value="30" min="0" max="100" step="0.1" disabled>
+                            </div>
+                            <div class="ctrl-group">
+                                <label>Y (%)</label>
+                                <input id="textEditY" type="number" value="30" min="0" max="100" step="0.1" disabled>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="panel right-panel">
-            <h2>
-                可视化监视器
-                <div style="display:flex; gap:6px;">
-                    <button onclick="addTextBox()" style="padding:6px 10px;">+ 自由文本</button>
-                    <button onclick="deleteActiveTextBox()" class="btn-red" style="padding:6px 10px;">删文本</button>
-                </div>
-            </h2>
-
-            <div class="workspace">
-                <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
-                    <video id="mediaPlayer" class="preview-media" muted playsinline></video>
-                    <div id="mainSubtitle"></div>
-                    <div id="textLayer"></div>
+                    <div class="toolbar-row">
+                        <button id="generateBtn" class="btn-green btn-tall">第一步: 解析场景资产 (获取视频/配音)</button>
+                        <div class="action-row">
+                            <button id="playRecordBtn" class="btn-red btn-tall" style="flex:1;" disabled>第二步: 播放并录制</button>
+                            <button id="downloadBtn" class="btn-tall" style="flex:1;" disabled>第三步: 下载合并视频</button>
+                        </div>
+                        <div class="action-row">
+                            <button id="downloadScenesBtn" class="btn-tall" style="flex:1;" disabled>下载每个场景视频</button>
+                        </div>
+                        <div id="statusLog" class="status-log">等待操作...</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="text-inspector">
-                <div class="inspector-title">自由文本属性 (选中后可编辑)</div>
-                <div class="ctrl-group">
-                    <label>内容</label>
-                    <input id="textEditContent" type="text" placeholder="先在预览区点击一个文本" disabled>
-                </div>
-                <div class="row">
+            <div class="panel left-panel">
+                <h2>全局设置</h2>
+
+                <div class="panel-section">
+                    <h3>素材 &amp; 音频</h3>
                     <div class="ctrl-group">
-                        <label>颜色</label>
-                        <input id="textEditColor" type="color" value="#ffffff" disabled>
+                        <label style="color:var(--accent)">Pexels API Key (必填)</label>
+                        <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
+                    </div>
+
+                    <div class="ctrl-group">
+                        <label>视频导出尺寸</label>
+                        <select id="videoSize" onchange="updatePreviewRatio()">
+                            <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
+                            <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
+                            <option value="1080,1080">1:1 正方形 (1080x1080)</option>
+                            <option value="1200,900">4:3 传统横屏 (1200x900)</option>
+                            <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
+                        </select>
+                    </div>
+
+                    <div class="ctrl-group">
+                        <label>背景音乐库 (可多选)</label>
+                        <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
+                        <div class="bgm-library">
+                            <select id="bgmLibraryList" class="bgm-list" multiple></select>
+                            <div class="bgm-actions">
+                                <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
+                                <button type="button" id="clearBgmBtn">清空音乐库</button>
+                            </div>
+                            <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
+                        </div>
+                        <label>音量调节: <span id="bgmVolVal">15%</span></label>
+                        <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>主字幕样式</h3>
+                    <div class="ctrl-group">
+                        <label>字体库</label>
+                        <select id="fontFamily">
+                            <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                            <option value="SimHei, sans-serif">黑体</option>
+                            <option value="KaiTi, serif">楷体</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="ctrl-group">
+                            <label>字号大小</label>
+                            <input type="number" id="fontSize" value="55" min="16" max="150">
+                        </div>
+                        <div class="ctrl-group">
+                            <label>字体颜色</label>
+                            <input type="color" id="fontColor" value="#ffffff">
+                        </div>
                     </div>
                     <div class="ctrl-group">
-                        <label>字号</label>
-                        <input id="textEditSize" type="number" value="24" min="12" max="300" disabled>
-                    </div>
-                </div>
-                <div class="ctrl-group">
-                    <label>HEX 颜色值</label>
-                    <input id="textEditHex" class="hex-input" type="text" value="#ffffff" placeholder="#RRGGBB" disabled>
-                </div>
-                <div class="ctrl-group">
-                    <label>常用文字颜色</label>
-                    <div id="textColorPresetBar" class="color-presets"></div>
-                </div>
-                <div class="ctrl-group">
-                    <label>文字样式预设</label>
-                    <select id="textStylePreset" disabled>
-                        <option value="custom">自定义</option>
-                        <option value="title">标题白字</option>
-                        <option value="gold">电商金字</option>
-                        <option value="neon">科技青字</option>
-                        <option value="alert">警示红字</option>
-                    </select>
-                </div>
-                <div class="row">
-                    <div class="ctrl-group">
-                        <label>X (%)</label>
-                        <input id="textEditX" type="number" value="30" min="0" max="100" step="0.1" disabled>
+                        <label>字体 HEX 颜色值</label>
+                        <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
                     </div>
                     <div class="ctrl-group">
-                        <label>Y (%)</label>
-                        <input id="textEditY" type="number" value="30" min="0" max="100" step="0.1" disabled>
+                        <label>常用字幕颜色</label>
+                        <div id="fontColorPresetBar" class="color-presets"></div>
+                    </div>
+                    <div class="ctrl-group">
+                        <label>字幕样式预设</label>
+                        <select id="subtitleStylePreset">
+                            <option value="classic">经典白字</option>
+                            <option value="film">电影黄字</option>
+                            <option value="neon">霓虹青字</option>
+                            <option value="warning">警示红字</option>
+                        </select>
                     </div>
                 </div>
             </div>
 
-            <div class="toolbar-row">
-                <button id="generateBtn" class="btn-green" style="height:42px;">第一步: 解析场景资产 (获取视频/配音)</button>
-                <div class="action-row">
-                    <button id="playRecordBtn" class="btn-red" style="flex:1; height:42px;" disabled>第二步: 播放并录制</button>
-                    <button id="downloadBtn" style="flex:1; height:42px;" disabled>第三步: 下载合并视频</button>
+            <div class="panel middle-panel">
+                <h2 class="panel-headline">
+                    <div class="panel-title-wrap">
+                        <span>场景编排轨道</span>
+                        <span class="panel-subtitle" id="sceneDurationSummary">总时长预估: 00:00</span>
+                    </div>
+                    <button onclick="addScene()" class="btn-green btn-compact">+ 添加场景</button>
+                </h2>
+                <div id="scenesContainer"></div>
+                <div class="timeline-overview">
+                    <div class="timeline-head">
+                        <span>时间轴预览</span>
+                        <span id="timelineTotal">00:00</span>
+                    </div>
+                    <div id="timelineTrack" class="timeline-track"></div>
+                    <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
                 </div>
-                <div class="action-row">
-                    <button id="downloadScenesBtn" style="flex:1; height:42px;" disabled>下载每个场景视频</button>
-                </div>
-                <div id="statusLog" class="status-log">等待操作...</div>
             </div>
         </div>
     </div>
@@ -822,8 +1145,41 @@
 
     <script>
         const pexelsInput = document.getElementById('pexelsKey');
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const THEME_KEY = 'studio_theme';
         if (localStorage.getItem('pexels_key')) pexelsInput.value = localStorage.getItem('pexels_key');
         function saveKey() { localStorage.setItem('pexels_key', pexelsInput.value.trim()); }
+
+        function getInitialTheme() {
+            const saved = localStorage.getItem(THEME_KEY);
+            if (saved === 'light' || saved === 'dark') return saved;
+            return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+
+        function applyTheme(theme, persist = true) {
+            const next = theme === 'light' ? 'light' : 'dark';
+            document.body.dataset.theme = next;
+            if (themeToggleBtn) {
+                themeToggleBtn.innerText = next === 'light' ? '切换暗黑' : '切换明亮';
+                themeToggleBtn.setAttribute('aria-label', next === 'light' ? '切换到暗黑模式' : '切换到明亮模式');
+            }
+            if (persist) localStorage.setItem(THEME_KEY, next);
+        }
+
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                const current = document.body.dataset.theme === 'light' ? 'light' : 'dark';
+                applyTheme(current === 'light' ? 'dark' : 'light');
+            });
+        }
+
+        const railItems = [...document.querySelectorAll('.rail-item')];
+        railItems.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                railItems.forEach(item => item.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
 
         function clampNum(value, min, max) {
             if (!Number.isFinite(value)) return min;
@@ -986,29 +1342,42 @@
 
         function log(msg, level = 'info') {
             DOM.log.innerText = `> ${msg}`;
-            const color = level === 'error' ? '#ff9dc1' : level === 'success' ? '#93ffd5' : '#b8f5dc';
+            const color = level === 'error'
+                ? 'var(--status-error-text)'
+                : level === 'success'
+                    ? 'var(--status-ok-text)'
+                    : 'var(--accent)';
             DOM.log.style.color = color;
         }
 
         function setStatus(label, mode = 'idle') {
             DOM.statusPill.innerText = `状态: ${label}`;
-            if (mode === 'busy') {
-                DOM.statusPill.style.borderColor = 'rgba(255, 165, 79, 0.55)';
-                DOM.statusPill.style.background = 'rgba(76, 43, 8, 0.42)';
-                DOM.statusPill.style.color = '#ffc894';
-            } else if (mode === 'ok') {
-                DOM.statusPill.style.borderColor = 'rgba(83, 215, 168, 0.45)';
-                DOM.statusPill.style.background = 'rgba(14, 57, 48, 0.42)';
-                DOM.statusPill.style.color = '#8fffd4';
-            } else if (mode === 'error') {
-                DOM.statusPill.style.borderColor = 'rgba(255, 110, 148, 0.55)';
-                DOM.statusPill.style.background = 'rgba(69, 18, 37, 0.42)';
-                DOM.statusPill.style.color = '#ff98bc';
-            } else {
-                DOM.statusPill.style.borderColor = 'rgba(165, 138, 237, 0.5)';
-                DOM.statusPill.style.background = 'rgba(25, 18, 48, 0.52)';
-                DOM.statusPill.style.color = '#d8c9ff';
-            }
+            const statusTheme = {
+                idle: {
+                    border: 'var(--status-idle-border)',
+                    bg: 'var(--status-idle-bg)',
+                    color: 'var(--status-idle-text)'
+                },
+                busy: {
+                    border: 'var(--status-busy-border)',
+                    bg: 'var(--status-busy-bg)',
+                    color: 'var(--status-busy-text)'
+                },
+                ok: {
+                    border: 'var(--status-ok-border)',
+                    bg: 'var(--status-ok-bg)',
+                    color: 'var(--status-ok-text)'
+                },
+                error: {
+                    border: 'var(--status-error-border)',
+                    bg: 'var(--status-error-bg)',
+                    color: 'var(--status-error-text)'
+                }
+            };
+            const style = statusTheme[mode] || statusTheme.idle;
+            DOM.statusPill.style.borderColor = style.border;
+            DOM.statusPill.style.background = style.bg;
+            DOM.statusPill.style.color = style.color;
         }
 
         function formatDurationClock(seconds) {
@@ -2587,6 +2956,8 @@
             updatePreviewFrameSize();
             repositionTextBoxes();
         });
+        applyTheme(getInitialTheme(), false);
+        setStatus('待命', 'idle');
         setMainFontColor(DOM.fontColor.value);
         applySubtitleStylePreset(DOM.subtitleStylePreset.value, false);
         applySubtitlePreviewStyle();
