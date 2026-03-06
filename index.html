@@ -260,8 +260,9 @@
         }
 
         .workspace {
-            flex: 1;
-            min-height: 260px;
+            flex: 0 0 clamp(220px, 48vh, 560px);
+            min-height: 220px;
+            max-height: 560px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -270,18 +271,21 @@
                 radial-gradient(500px 240px at 70% 10%, rgba(132, 49, 255, 0.14), transparent 60%),
                 #05070f;
             border: 1px solid rgba(99, 64, 184, 0.62);
-            overflow: hidden;
+            overflow: auto;
             padding: 10px;
         }
 
         .preview-box {
             position: relative;
             width: 100%;
+            height: auto;
+            max-width: 100%;
             max-height: 100%;
             aspect-ratio: 16/9;
             border-radius: 10px;
             background: #0f1222;
             overflow: hidden;
+            flex-shrink: 0;
             box-shadow: inset 0 0 0 1px rgba(143, 88, 255, 0.28), 0 16px 40px rgba(1, 0, 5, 0.6);
         }
 
@@ -318,13 +322,36 @@
             cursor: grab;
             user-select: none;
             white-space: nowrap;
-            padding: 4px 6px;
+            padding: 4px 12px 10px 6px;
             border: 1px dashed transparent;
             border-radius: 6px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
             font-weight: 700;
             touch-action: none;
             transition: border-color 0.12s, background 0.12s;
+        }
+
+        .draggable-text-content {
+            pointer-events: none;
+        }
+
+        .text-resize-handle {
+            position: absolute;
+            right: 2px;
+            bottom: 2px;
+            width: 9px;
+            height: 9px;
+            border-right: 2px solid rgba(230, 220, 255, 0.9);
+            border-bottom: 2px solid rgba(230, 220, 255, 0.9);
+            border-radius: 1px;
+            cursor: nwse-resize;
+            opacity: 0.85;
+            touch-action: none;
+        }
+
+        .draggable-text.active .text-resize-handle {
+            border-right-color: #be92ff;
+            border-bottom-color: #be92ff;
         }
 
         .draggable-text:hover {
@@ -522,7 +549,21 @@
                     </div>
                     <div class="ctrl-group">
                         <label>字号</label>
-                        <input id="textEditSize" type="number" value="24" min="12" max="200" disabled>
+                        <input id="textEditSize" type="number" value="24" min="12" max="300" disabled>
+                    </div>
+                </div>
+                <div class="ctrl-group">
+                    <label>HEX 颜色值</label>
+                    <input id="textEditHex" type="text" value="#ffffff" placeholder="#RRGGBB" disabled>
+                </div>
+                <div class="row">
+                    <div class="ctrl-group">
+                        <label>X (%)</label>
+                        <input id="textEditX" type="number" value="30" min="0" max="100" step="0.1" disabled>
+                    </div>
+                    <div class="ctrl-group">
+                        <label>Y (%)</label>
+                        <input id="textEditY" type="number" value="30" min="0" max="100" step="0.1" disabled>
                     </div>
                 </div>
             </div>
@@ -545,9 +586,47 @@
         if (localStorage.getItem('pexels_key')) pexelsInput.value = localStorage.getItem('pexels_key');
         function saveKey() { localStorage.setItem('pexels_key', pexelsInput.value.trim()); }
 
+        function clampNum(value, min, max) {
+            if (!Number.isFinite(value)) return min;
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function formatPct(value) {
+            return (Math.round(value * 10) / 10).toString();
+        }
+
+        function normalizeHexColor(raw) {
+            if (!raw) return null;
+            let hex = raw.trim().replace(/^#/, '');
+            if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+                hex = hex.split('').map(ch => ch + ch).join('');
+            }
+            if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+            return `#${hex.toLowerCase()}`;
+        }
+
+        function updatePreviewFrameSize() {
+            if (!DOM.workspace || !DOM.preview) return;
+            const [w, h] = document.getElementById('videoSize').value.split(',').map(Number);
+            const ratio = w / h;
+            const maxW = Math.max(120, DOM.workspace.clientWidth - 20);
+            const maxH = Math.max(120, DOM.workspace.clientHeight - 20);
+
+            let targetW = maxW;
+            let targetH = targetW / ratio;
+            if (targetH > maxH) {
+                targetH = maxH;
+                targetW = targetH * ratio;
+            }
+
+            DOM.preview.style.width = `${Math.floor(targetW)}px`;
+            DOM.preview.style.height = `${Math.floor(targetH)}px`;
+        }
+
         function updatePreviewRatio() {
             const [w, h] = document.getElementById('videoSize').value.split(',').map(Number);
             document.getElementById('previewBox').style.aspectRatio = `${w} / ${h}`;
+            updatePreviewFrameSize();
             repositionTextBoxes();
         }
 
@@ -565,9 +644,12 @@
             recordedChunks: [],
             animFrame: null,
             activeVoice: null,
+            activeVoiceEl: null,
+            activeVoiceNode: null,
             sceneTimer: null,
             objectUrls: [],
-            dragState: { box: null, startX: 0, startY: 0, startL: 0, startT: 0 }
+            dragState: { box: null, startX: 0, startY: 0, startL: 0, startT: 0 },
+            resizeState: { box: null, startX: 0, startY: 0, startSize: 24 }
         };
 
         const DOM = {
@@ -577,12 +659,16 @@
             player: document.getElementById('mediaPlayer'),
             subtitle: document.getElementById('mainSubtitle'),
             preview: document.getElementById('previewBox'),
+            workspace: document.querySelector('.workspace'),
             textLayer: document.getElementById('textLayer'),
             sceneCounter: document.getElementById('sceneCounter'),
             statusPill: document.querySelector('.status-pill'),
             textEditContent: document.getElementById('textEditContent'),
             textEditColor: document.getElementById('textEditColor'),
-            textEditSize: document.getElementById('textEditSize')
+            textEditSize: document.getElementById('textEditSize'),
+            textEditHex: document.getElementById('textEditHex'),
+            textEditX: document.getElementById('textEditX'),
+            textEditY: document.getElementById('textEditY')
         };
 
         function log(msg, level = 'info') {
@@ -629,6 +715,16 @@
                 try { Engine.activeVoice.stop(); } catch (e) {}
                 Engine.activeVoice.disconnect();
                 Engine.activeVoice = null;
+            }
+            if (Engine.activeVoiceEl) {
+                Engine.activeVoiceEl.onended = null;
+                Engine.activeVoiceEl.onerror = null;
+                try { Engine.activeVoiceEl.pause(); } catch (e) {}
+                Engine.activeVoiceEl = null;
+            }
+            if (Engine.activeVoiceNode) {
+                try { Engine.activeVoiceNode.disconnect(); } catch (e) {}
+                Engine.activeVoiceNode = null;
             }
         }
 
@@ -706,17 +802,31 @@
             DOM.textEditContent.disabled = disabled;
             DOM.textEditColor.disabled = disabled;
             DOM.textEditSize.disabled = disabled;
+            DOM.textEditHex.disabled = disabled;
+            DOM.textEditX.disabled = disabled;
+            DOM.textEditY.disabled = disabled;
 
             if (disabled) {
                 DOM.textEditContent.value = '';
                 DOM.textEditColor.value = '#ffffff';
                 DOM.textEditSize.value = 24;
+                DOM.textEditHex.value = '#ffffff';
+                DOM.textEditX.value = 30;
+                DOM.textEditY.value = 30;
                 return;
             }
 
             DOM.textEditContent.value = activeTextBox.text;
             DOM.textEditColor.value = activeTextBox.color;
             DOM.textEditSize.value = Math.round(activeTextBox.size);
+            DOM.textEditHex.value = activeTextBox.color;
+            syncActiveTextPositionInputs();
+        }
+
+        function syncActiveTextPositionInputs() {
+            if (!activeTextBox) return;
+            DOM.textEditX.value = formatPct(activeTextBox.x_pct * 100);
+            DOM.textEditY.value = formatPct(activeTextBox.y_pct * 100);
         }
 
         function selectTextBox(txtObj) {
@@ -727,17 +837,25 @@
         }
 
         function applyTextStyle(txtObj) {
-            txtObj.el.innerText = txtObj.text;
+            if (txtObj.contentEl) txtObj.contentEl.innerText = txtObj.text;
+            else txtObj.el.innerText = txtObj.text;
             txtObj.el.style.color = txtObj.color;
             txtObj.el.style.fontSize = `${txtObj.size}px`;
             txtObj.el.style.fontFamily = document.getElementById('fontFamily').value;
         }
 
         function applyTextPositionFromPct(txtObj) {
-            const w = DOM.preview.clientWidth;
-            const h = DOM.preview.clientHeight;
-            txtObj.el.style.left = `${Math.max(0, Math.min(w - txtObj.el.offsetWidth, txtObj.x_pct * w))}px`;
-            txtObj.el.style.top = `${Math.max(0, Math.min(h - txtObj.el.offsetHeight, txtObj.y_pct * h))}px`;
+            const w = DOM.preview.clientWidth || 1;
+            const h = DOM.preview.clientHeight || 1;
+            const maxL = Math.max(0, w - txtObj.el.offsetWidth);
+            const maxT = Math.max(0, h - txtObj.el.offsetHeight);
+            const left = clampNum(txtObj.x_pct * w, 0, maxL);
+            const top = clampNum(txtObj.y_pct * h, 0, maxT);
+            txtObj.el.style.left = `${left}px`;
+            txtObj.el.style.top = `${top}px`;
+            txtObj.x_pct = w ? left / w : 0;
+            txtObj.y_pct = h ? top / h : 0;
+            if (txtObj === activeTextBox) syncActiveTextPositionInputs();
         }
 
         function repositionTextBoxes() {
@@ -750,6 +868,8 @@
             const txtObj = {
                 id,
                 el,
+                contentEl: null,
+                resizeHandle: null,
                 text: '双击修改',
                 x_pct: 0.3,
                 y_pct: 0.3,
@@ -759,6 +879,15 @@
 
             el.className = 'draggable-text';
             el.dataset.textId = id;
+            const contentEl = document.createElement('span');
+            contentEl.className = 'draggable-text-content';
+            const resizeHandle = document.createElement('span');
+            resizeHandle.className = 'text-resize-handle';
+            resizeHandle.title = '拖动调整文本大小';
+            el.appendChild(contentEl);
+            el.appendChild(resizeHandle);
+            txtObj.contentEl = contentEl;
+            txtObj.resizeHandle = resizeHandle;
             applyTextStyle(txtObj);
 
             Engine.textBoxes.push(txtObj);
@@ -766,6 +895,7 @@
 
             makeDraggable(el, txtObj);
             makeEditable(el, txtObj);
+            makeResizable(resizeHandle, txtObj);
 
             requestAnimationFrame(() => {
                 applyTextPositionFromPct(txtObj);
@@ -784,6 +914,7 @@
 
         function makeDraggable(el, txtObj) {
             el.addEventListener('pointerdown', (e) => {
+                if (e.target === txtObj.resizeHandle) return;
                 e.preventDefault();
                 selectTextBox(txtObj);
                 Engine.dragState.box = txtObj;
@@ -796,7 +927,8 @@
         }
 
         function makeEditable(el, txtObj) {
-            el.addEventListener('dblclick', () => {
+            el.addEventListener('dblclick', (e) => {
+                if (e.target === txtObj.resizeHandle) return;
                 const nt = prompt('修改文字：', txtObj.text);
                 if (nt !== null && nt.trim() !== '') {
                     txtObj.text = nt.trim();
@@ -805,10 +937,39 @@
                 }
             });
 
-            el.addEventListener('click', () => selectTextBox(txtObj));
+            el.addEventListener('click', (e) => {
+                if (e.target === txtObj.resizeHandle) return;
+                selectTextBox(txtObj);
+            });
+        }
+
+        function makeResizable(handle, txtObj) {
+            handle.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectTextBox(txtObj);
+                Engine.resizeState.box = txtObj;
+                Engine.resizeState.startX = e.clientX;
+                Engine.resizeState.startY = e.clientY;
+                Engine.resizeState.startSize = txtObj.size;
+            });
         }
 
         document.addEventListener('pointermove', (e) => {
+            const resizeTarget = Engine.resizeState.box;
+            if (resizeTarget) {
+                const dx = e.clientX - Engine.resizeState.startX;
+                const dy = e.clientY - Engine.resizeState.startY;
+                const newSize = clampNum(Engine.resizeState.startSize + (dx + dy) * 0.35, 12, 300);
+                resizeTarget.size = newSize;
+                applyTextStyle(resizeTarget);
+                applyTextPositionFromPct(resizeTarget);
+                if (resizeTarget === activeTextBox) {
+                    DOM.textEditSize.value = Math.round(newSize);
+                }
+                return;
+            }
+
             const target = Engine.dragState.box;
             if (!target) return;
 
@@ -824,6 +985,7 @@
 
             target.x_pct = DOM.preview.clientWidth ? newL / DOM.preview.clientWidth : 0;
             target.y_pct = DOM.preview.clientHeight ? newT / DOM.preview.clientHeight : 0;
+            if (target === activeTextBox) syncActiveTextPositionInputs();
         });
 
         document.addEventListener('pointerup', () => {
@@ -831,6 +993,7 @@
                 Engine.dragState.box.el.style.cursor = 'grab';
             }
             Engine.dragState.box = null;
+            Engine.resizeState.box = null;
         });
 
         document.addEventListener('keydown', (e) => {
@@ -851,14 +1014,44 @@
         DOM.textEditColor.addEventListener('input', (e) => {
             if (!activeTextBox) return;
             activeTextBox.color = e.target.value;
+            DOM.textEditHex.value = activeTextBox.color;
             applyTextStyle(activeTextBox);
         });
 
         DOM.textEditSize.addEventListener('input', (e) => {
             if (!activeTextBox) return;
-            const size = Math.max(12, Math.min(200, Number(e.target.value) || 24));
+            const size = clampNum(Number(e.target.value), 12, 300);
             activeTextBox.size = size;
             applyTextStyle(activeTextBox);
+            applyTextPositionFromPct(activeTextBox);
+        });
+
+        DOM.textEditHex.addEventListener('input', (e) => {
+            if (!activeTextBox) return;
+            const normalized = normalizeHexColor(e.target.value);
+            if (!normalized) return;
+            activeTextBox.color = normalized;
+            DOM.textEditColor.value = normalized;
+            applyTextStyle(activeTextBox);
+        });
+
+        DOM.textEditHex.addEventListener('blur', () => {
+            if (!activeTextBox) return;
+            const normalized = normalizeHexColor(DOM.textEditHex.value);
+            DOM.textEditHex.value = normalized || activeTextBox.color;
+        });
+
+        DOM.textEditX.addEventListener('input', (e) => {
+            if (!activeTextBox) return;
+            const value = clampNum(Number(e.target.value), 0, 100);
+            activeTextBox.x_pct = value / 100;
+            applyTextPositionFromPct(activeTextBox);
+        });
+
+        DOM.textEditY.addEventListener('input', (e) => {
+            if (!activeTextBox) return;
+            const value = clampNum(Number(e.target.value), 0, 100);
+            activeTextBox.y_pct = value / 100;
             applyTextPositionFromPct(activeTextBox);
         });
 
@@ -875,11 +1068,13 @@
         });
 
         function getPreferredMimeType() {
+            if (typeof MediaRecorder === 'undefined') return '';
             const candidates = [
                 'video/webm;codecs=vp9,opus',
                 'video/webm;codecs=vp8,opus',
                 'video/webm;codecs=vp8',
-                'video/webm'
+                'video/webm',
+                'video/mp4'
             ];
             return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
         }
@@ -915,22 +1110,78 @@
             return await Engine.audioCtx.decodeAudioData(arr);
         }
 
-        async function fetchTTSBuffer(text, voiceId) {
-            const ttsUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${voiceId}`;
-            const candidates = [
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`,
-                ttsUrl
+        async function getAudioDuration(url) {
+            return new Promise((resolve) => {
+                const probe = document.createElement('audio');
+                let done = false;
+                const finalize = (val) => {
+                    if (done) return;
+                    done = true;
+                    probe.removeAttribute('src');
+                    probe.load();
+                    resolve(val);
+                };
+
+                probe.preload = 'metadata';
+                probe.crossOrigin = 'anonymous';
+                probe.onloadedmetadata = () => {
+                    const duration = Number.isFinite(probe.duration) && probe.duration > 0 ? probe.duration : 0;
+                    finalize(duration);
+                };
+                probe.onerror = () => finalize(0);
+                probe.src = url;
+                setTimeout(() => finalize(0), 7000);
+            });
+        }
+
+        function buildTtsCandidateUrls(text, voiceId) {
+            const baiduUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${voiceId}`;
+            const seVoiceMap = {
+                '0': 'Zhiyu',
+                '1': 'Yunxi',
+                '3': 'Yunjian',
+                '4': 'Xiaoxiao'
+            };
+            const seVoice = seVoiceMap[voiceId] || 'Zhiyu';
+            return [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(baiduUrl)}`,
+                baiduUrl,
+                `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(seVoice)}&text=${encodeURIComponent(text)}`
             ];
+        }
+
+        async function fetchTTSAsset(text, voiceId) {
+            const candidates = buildTtsCandidateUrls(text, voiceId);
 
             for (const candidate of candidates) {
                 try {
                     const audioBuffer = await tryDecodeAudioFromUrl(candidate);
-                    return audioBuffer;
+                    return {
+                        audioBuffer,
+                        audioUrl: candidate,
+                        duration: audioBuffer.duration || 0
+                    };
                 } catch (err) {
-                    console.warn('TTS 获取失败:', candidate);
+                    console.warn('TTS 解码失败:', candidate);
                 }
             }
-            return null;
+
+            for (const candidate of candidates) {
+                const duration = await getAudioDuration(candidate);
+                if (duration > 0) {
+                    return {
+                        audioBuffer: null,
+                        audioUrl: candidate,
+                        duration
+                    };
+                }
+            }
+
+            return {
+                audioBuffer: null,
+                audioUrl: candidates[1] || candidates[0] || null,
+                duration: 0
+            };
         }
 
         document.getElementById('generateBtn').onclick = async function () {
@@ -970,6 +1221,8 @@
                     const voiceId = document.getElementById(`voice-${id}`).value;
                     let videoUrl = null;
                     let audioBuffer = null;
+                    let ttsUrl = null;
+                    let ttsDuration = 0;
 
                     if (source === 'pexels') {
                         const key = pexelsInput.value.trim();
@@ -1000,17 +1253,24 @@
                     }
 
                     if (text) {
-                        audioBuffer = await fetchTTSBuffer(text, voiceId);
+                        const ttsAsset = await fetchTTSAsset(text, voiceId);
+                        audioBuffer = ttsAsset.audioBuffer;
+                        ttsUrl = ttsAsset.audioUrl;
+                        ttsDuration = ttsAsset.duration || 0;
+                        if (!audioBuffer && !ttsUrl) {
+                            log(`场景 ${idx + 1} 配音获取失败，将仅使用视频原声。`, 'error');
+                        }
                     }
 
                     const videoDuration = await getVideoDuration(videoUrl);
-                    const duration = audioBuffer ? audioBuffer.duration : videoDuration;
+                    const duration = ttsDuration || videoDuration;
 
                     Engine.scenes.push({
                         id,
                         videoUrl,
                         text,
                         audioBuffer,
+                        ttsUrl,
                         duration: Math.max(1, duration || 4)
                     });
                 }
@@ -1031,6 +1291,10 @@
         document.getElementById('playRecordBtn').onclick = async function () {
             if (!Engine.scenes.length) {
                 alert('请先执行第一步解析场景资产。');
+                return;
+            }
+            if (typeof MediaRecorder === 'undefined') {
+                alert('当前浏览器不支持 MediaRecorder，无法进行录制下载。');
                 return;
             }
 
@@ -1055,29 +1319,45 @@
 
             const dest = Engine.audioCtx.createMediaStreamDestination();
             let bgmSrc = null;
-            if (Engine.bgmBuffer) {
-                bgmSrc = Engine.audioCtx.createBufferSource();
-                bgmSrc.buffer = Engine.bgmBuffer;
-                bgmSrc.loop = true;
-                const gain = Engine.audioCtx.createGain();
-                gain.gain.value = parseFloat(document.getElementById('bgmVolume').value);
-                bgmSrc.connect(gain).connect(dest);
-                gain.connect(Engine.audioCtx.destination);
-                bgmSrc.start(0);
-            }
-
-            const vStream = DOM.canvas.captureStream(30);
-            const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-
-            const mimeType = getPreferredMimeType();
             try {
+                if (Engine.bgmBuffer) {
+                    bgmSrc = Engine.audioCtx.createBufferSource();
+                    bgmSrc.buffer = Engine.bgmBuffer;
+                    bgmSrc.loop = true;
+                    const gain = Engine.audioCtx.createGain();
+                    gain.gain.value = parseFloat(document.getElementById('bgmVolume').value);
+                    bgmSrc.connect(gain).connect(dest);
+                    gain.connect(Engine.audioCtx.destination);
+                    bgmSrc.start(0);
+                }
+
+                const vStream = DOM.canvas.captureStream(30);
+                const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                const mimeType = getPreferredMimeType();
                 Engine.mediaRecorder = mimeType ? new MediaRecorder(mixStream, { mimeType }) : new MediaRecorder(mixStream);
             } catch (err) {
-                Engine.mediaRecorder = new MediaRecorder(mixStream);
+                console.error(err);
+                if (bgmSrc) {
+                    try { bgmSrc.stop(); } catch (e) {}
+                }
+                Engine.isPlaying = false;
+                this.disabled = false;
+                this.innerText = '第二步: 播放并录制';
+                setStatus('录制失败', 'error');
+                log(`录制器初始化失败: ${err.message || err}`, 'error');
+                return;
             }
 
             Engine.mediaRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) Engine.recordedChunks.push(e.data);
+            };
+            Engine.mediaRecorder.onerror = (e) => {
+                console.error('MediaRecorder 错误:', e);
+                log('录制器发生错误，正在停止录制。', 'error');
+                setStatus('录制失败', 'error');
+                if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
+                    try { Engine.mediaRecorder.stop(); } catch (stopErr) {}
+                }
             };
 
             Engine.mediaRecorder.onstop = () => {
@@ -1096,12 +1376,30 @@
 
                 this.disabled = false;
                 this.innerText = '重新录制';
-                document.getElementById('downloadBtn').disabled = Engine.recordedChunks.length === 0;
-                log('视频录制结束，点击下载保存。', 'success');
-                setStatus('录制完成', 'ok');
+                document.getElementById('downloadBtn').disabled = false;
+                if (Engine.recordedChunks.length > 0) {
+                    log('视频录制结束，点击下载保存。', 'success');
+                    setStatus('录制完成', 'ok');
+                } else {
+                    log('录制结束但未生成可下载数据，请重试。', 'error');
+                    setStatus('录制无数据', 'error');
+                }
             };
 
-            Engine.mediaRecorder.start(400);
+            try {
+                Engine.mediaRecorder.start(400);
+            } catch (err) {
+                console.error(err);
+                if (bgmSrc) {
+                    try { bgmSrc.stop(); } catch (e) {}
+                }
+                this.disabled = false;
+                this.innerText = '第二步: 播放并录制';
+                Engine.isPlaying = false;
+                setStatus('录制失败', 'error');
+                log(`录制启动失败: ${err.message || err}`, 'error');
+                return;
+            }
             playNextScene(dest);
             renderLoop();
         };
@@ -1133,16 +1431,23 @@
                 Engine.currentIdx += 1;
                 playNextScene(dest);
             };
+            const loadWatchdog = setTimeout(() => {
+                log(`场景 ${Engine.currentIdx + 1} 加载超时，自动跳过。`, 'error');
+                advance();
+            }, 12000);
 
             DOM.player.onended = () => {
-                if (!scene.audioBuffer) advance();
+                clearTimeout(loadWatchdog);
+                if (!scene.audioBuffer && !scene.ttsUrl) advance();
             };
             DOM.player.onerror = () => {
+                clearTimeout(loadWatchdog);
                 log(`场景 ${Engine.currentIdx + 1} 视频加载失败，自动跳过。`, 'error');
                 advance();
             };
 
             DOM.player.oncanplay = async () => {
+                clearTimeout(loadWatchdog);
                 try { await DOM.player.play(); } catch (e) {}
 
                 if (scene.audioBuffer) {
@@ -1156,6 +1461,36 @@
                     voice.start(0);
 
                     Engine.sceneTimer = setTimeout(advance, (scene.duration + 0.15) * 1000);
+                } else if (scene.ttsUrl) {
+                    const voiceEl = new Audio(scene.ttsUrl);
+                    voiceEl.preload = 'auto';
+                    voiceEl.crossOrigin = 'anonymous';
+                    voiceEl.playsInline = true;
+
+                    try {
+                        const voiceNode = Engine.audioCtx.createMediaElementSource(voiceEl);
+                        voiceNode.connect(dest);
+                        voiceNode.connect(Engine.audioCtx.destination);
+                        Engine.activeVoiceNode = voiceNode;
+                    } catch (err) {
+                        console.warn('TTS 媒体节点创建失败，将直接播放音频。', err);
+                    }
+
+                    Engine.activeVoiceEl = voiceEl;
+                    voiceEl.onended = advance;
+                    voiceEl.onerror = () => {
+                        log(`场景 ${Engine.currentIdx + 1} 配音播放失败，已跳过。`, 'error');
+                        advance();
+                    };
+
+                    try {
+                        await voiceEl.play();
+                    } catch (err) {
+                        log(`场景 ${Engine.currentIdx + 1} 配音播放失败，已跳过。`, 'error');
+                        advance();
+                        return;
+                    }
+                    Engine.sceneTimer = setTimeout(advance, (scene.duration + 0.2) * 1000);
                 } else {
                     Engine.sceneTimer = setTimeout(advance, scene.duration * 1000);
                 }
@@ -1261,20 +1596,28 @@
                 return;
             }
 
-            const blob = new Blob(Engine.recordedChunks, { type: 'video/webm' });
+            const outputType = Engine.recordedChunks[0] && Engine.recordedChunks[0].type
+                ? Engine.recordedChunks[0].type
+                : 'video/webm';
+            const ext = outputType.includes('mp4') ? 'mp4' : 'webm';
+            const blob = new Blob(Engine.recordedChunks, { type: outputType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AI全能矩阵视频_${Date.now()}.webm`;
+            a.download = `AI全能矩阵视频_${Date.now()}.${ext}`;
             a.click();
             setTimeout(() => URL.revokeObjectURL(url), 1500);
             log('下载已触发。', 'success');
         };
 
-        window.addEventListener('resize', repositionTextBoxes);
+        window.addEventListener('resize', () => {
+            updatePreviewFrameSize();
+            repositionTextBoxes();
+        });
         applySubtitlePreviewStyle();
         syncTextInspector();
         updateSceneCounter();
+        updatePreviewRatio();
     </script>
 </body>
 </html>
