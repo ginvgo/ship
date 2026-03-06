@@ -37,7 +37,8 @@
                 linear-gradient(145deg, #090512 0%, #0d0720 46%, #090512 100%);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         .studio-topbar {
@@ -103,9 +104,9 @@
             min-height: 0;
             padding: var(--grid-gap);
             display: grid;
-            grid-template-columns: 320px minmax(360px, 1fr) 450px;
+            grid-template-columns: 320px minmax(360px, 1fr) minmax(520px, 40vw);
             gap: var(--grid-gap);
-            overflow: hidden;
+            overflow: visible;
         }
 
         .panel {
@@ -260,9 +261,9 @@
         }
 
         .workspace {
-            flex: 0 0 clamp(220px, 48vh, 560px);
-            min-height: 220px;
-            max-height: 560px;
+            flex: 0 0 clamp(360px, 68vh, 900px);
+            min-height: 360px;
+            max-height: 900px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -412,6 +413,12 @@
                 grid-template-areas:
                     "left right"
                     "middle right";
+            }
+
+            .workspace {
+                flex-basis: clamp(320px, 62vh, 760px);
+                min-height: 320px;
+                max-height: 760px;
             }
 
             .left-panel { grid-area: left; }
