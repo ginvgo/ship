@@ -7,6 +7,8 @@
     <style>
         :root {
             color-scheme: dark;
+            --topbar-height: 62px;
+            --workflow-height: 56px;
             --bg: #0a1222;
             --bg-elev: #0f1b30;
             --bg-soft: #152640;
@@ -125,7 +127,7 @@
         }
 
         .studio-topbar {
-            min-height: 62px;
+            min-height: var(--topbar-height);
             padding: 10px 18px;
             border-bottom: 1px solid var(--panel-border);
             display: flex;
@@ -176,8 +178,17 @@
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+
+        .scene-count-pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--panel-border);
+            background: var(--surface-muted);
             color: var(--text-soft);
             font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
         }
 
         .status-pill {
@@ -205,6 +216,64 @@
             background: color-mix(in srgb, var(--surface-subtle) 78%, var(--primary));
         }
 
+        .workflow-strip {
+            min-height: var(--workflow-height);
+            margin: var(--grid-gap) var(--grid-gap) 0;
+            padding: 8px 10px;
+            border-radius: 14px;
+            border: 1px solid var(--panel-border);
+            background: color-mix(in srgb, var(--panel) 86%, transparent);
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            position: sticky;
+            top: calc(var(--topbar-height) + 2px);
+            z-index: 24;
+            backdrop-filter: blur(8px);
+        }
+
+        .flow-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            border: 1px solid var(--panel-border);
+            border-radius: 11px;
+            padding: 7px 10px;
+            background: var(--surface-muted);
+            min-width: 0;
+        }
+
+        .flow-index {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            flex: 0 0 auto;
+            background: linear-gradient(135deg, var(--primary-strong), var(--primary));
+        }
+
+        .flow-item.is-active .flow-index {
+            background: linear-gradient(135deg, #11a47f, #2bd7a7);
+        }
+
+        .flow-text {
+            font-size: 12px;
+            line-height: 1.3;
+            color: var(--text-soft);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .flow-item.is-active .flow-text {
+            color: var(--text);
+            font-weight: 700;
+        }
+
         .studio-shell {
             flex: 1;
             min-height: 0;
@@ -226,6 +295,19 @@
             gap: 8px;
             padding: 12px 8px;
             overflow: auto;
+        }
+
+        .rail-title {
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-soft);
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--panel-border);
+            margin-bottom: 2px;
         }
 
         .rail-item {
@@ -268,17 +350,20 @@
         .app-grid {
             min-height: 0;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) clamp(320px, 30vw, 430px);
-            grid-template-rows: minmax(400px, 0.92fr) minmax(360px, 1.08fr);
+            grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.25fr) clamp(320px, 28vw, 430px);
+            grid-template-rows: minmax(410px, 0.96fr) minmax(360px, 1.04fr);
             grid-template-areas:
-                "preview config"
-                "timeline config";
+                "preview preview config"
+                "timeline timeline config";
             gap: var(--grid-gap);
             overflow: visible;
         }
 
         .left-panel {
             grid-area: config;
+            position: sticky;
+            top: calc(var(--topbar-height) + var(--workflow-height) + var(--grid-gap) + 6px);
+            max-height: calc(100vh - var(--topbar-height) - var(--workflow-height) - (var(--grid-gap) * 3));
         }
 
         .middle-panel {
@@ -338,6 +423,39 @@
             color: var(--text-soft);
             font-weight: 600;
             letter-spacing: 0.2px;
+        }
+
+        .panel-hint {
+            padding: 8px 10px;
+            border-radius: 9px;
+            border: 1px dashed var(--panel-border);
+            background: color-mix(in srgb, var(--surface-muted) 82%, transparent);
+            font-size: 11px;
+            color: var(--text-soft);
+            line-height: 1.45;
+        }
+
+        .headline-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .monitor-hints {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: -2px;
+        }
+
+        .hint-chip {
+            padding: 5px 9px;
+            border-radius: 999px;
+            border: 1px solid var(--panel-border);
+            background: var(--surface-muted);
+            color: var(--text-soft);
+            font-size: 11px;
+            font-weight: 600;
         }
 
         .panel-section {
@@ -734,11 +852,63 @@
             flex-direction: column;
             gap: 10px;
             min-width: 0;
+            position: sticky;
+            bottom: 0;
+            z-index: 6;
+            backdrop-filter: blur(6px);
         }
 
         .action-row {
             display: flex;
             gap: 10px;
+        }
+
+        .action-row > button {
+            flex: 1;
+        }
+
+        .toolbar-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 0.2px;
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .step-card {
+            padding: 7px 8px;
+            border-radius: 9px;
+            border: 1px solid var(--panel-border);
+            background: var(--surface-muted);
+            display: flex;
+            gap: 7px;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .step-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #fff;
+            background: linear-gradient(135deg, var(--primary-strong), var(--primary));
+            flex: 0 0 auto;
+        }
+
+        .step-copy {
+            font-size: 11px;
+            color: var(--text-soft);
+            line-height: 1.3;
+            overflow: hidden;
         }
 
         .status-log {
@@ -765,6 +935,12 @@
             font-size: 12px;
             font-weight: 700;
             color: var(--text);
+        }
+
+        .inspector-tip {
+            font-size: 11px;
+            color: var(--text-soft);
+            margin-top: -3px;
         }
 
         #scenesContainer {
@@ -841,7 +1017,7 @@
 
         @media (max-width: 1520px) {
             .app-grid {
-                grid-template-columns: minmax(0, 1fr) 360px;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 340px;
                 grid-template-rows: minmax(380px, 0.9fr) minmax(340px, 1.1fr);
             }
 
@@ -875,10 +1051,15 @@
                 grid-template-columns: 1fr;
                 grid-template-rows: auto;
                 grid-template-areas:
-                    "preview"
                     "config"
-                    "timeline";
+                    "timeline"
+                    "preview";
                 overflow: visible;
+            }
+
+            .left-panel {
+                position: static;
+                max-height: none;
             }
 
             .panel {
@@ -902,6 +1083,12 @@
                 width: 100%;
                 justify-content: space-between;
                 flex-wrap: wrap;
+            }
+
+            .workflow-strip {
+                grid-template-columns: 1fr;
+                min-height: auto;
+                gap: 6px;
             }
 
             .studio-shell {
@@ -930,6 +1117,10 @@
                 flex-direction: column;
             }
 
+            .step-grid {
+                grid-template-columns: 1fr;
+            }
+
             .workspace {
                 min-height: 220px;
             }
@@ -946,14 +1137,30 @@
             </div>
         </div>
         <div class="top-right">
-            <span id="sceneCounter">场景: 1</span>
+            <span id="sceneCounter" class="scene-count-pill">场景: 1</span>
             <span class="status-pill">状态: 待命</span>
             <button type="button" id="themeToggleBtn" class="theme-toggle" aria-label="切换亮暗主题">切换明亮</button>
         </div>
     </header>
 
+    <div class="workflow-strip" aria-label="工作流程">
+        <div class="flow-item is-active">
+            <span class="flow-index">1</span>
+            <span class="flow-text">配置素材源与字幕样式</span>
+        </div>
+        <div class="flow-item is-active">
+            <span class="flow-index">2</span>
+            <span class="flow-text">编排场景并调整文本</span>
+        </div>
+        <div class="flow-item">
+            <span class="flow-index">3</span>
+            <span class="flow-text">录制并导出最终视频</span>
+        </div>
+    </div>
+
     <div class="studio-shell">
         <aside class="tool-rail" aria-label="功能导航">
+            <div class="rail-title">快速定位</div>
             <button class="rail-item active" type="button" onclick="document.querySelector('.right-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
                 <span class="rail-icon">▦</span>
                 <span>Media</span>
@@ -982,13 +1189,21 @@
 
         <div class="app-grid">
             <div class="panel right-panel">
-                <h2>
-                    可视化监视器
-                    <div style="display:flex; gap:6px;">
+                <h2 class="panel-headline">
+                    <div class="panel-title-wrap">
+                        <span>可视化监视器</span>
+                        <span class="panel-subtitle">拖拽文本、实时预览字幕与视频画面</span>
+                    </div>
+                    <div class="headline-actions">
                         <button onclick="addTextBox()" class="btn-compact">+ 自由文本</button>
                         <button onclick="deleteActiveTextBox()" class="btn-red btn-compact">删文本</button>
                     </div>
                 </h2>
+                <div class="monitor-hints">
+                    <span class="hint-chip">双击文本可改字</span>
+                    <span class="hint-chip">拖拽角标可调字号</span>
+                    <span class="hint-chip">Delete 可快速删除</span>
+                </div>
 
                 <div class="workspace-shell">
                     <div class="workspace">
@@ -1002,7 +1217,8 @@
 
                 <div class="editor-lower">
                     <div class="text-inspector">
-                        <div class="inspector-title">自由文本属性 (选中后可编辑)</div>
+                        <div class="inspector-title">自由文本属性</div>
+                        <div class="inspector-tip">先在预览区点击文本，再进行内容/颜色/位置编辑。</div>
                         <div class="ctrl-group">
                             <label>内容</label>
                             <input id="textEditContent" type="text" placeholder="先在预览区点击一个文本" disabled>
@@ -1048,13 +1264,28 @@
                     </div>
 
                     <div class="toolbar-row">
+                        <div class="toolbar-title">导出流程</div>
+                        <div class="step-grid">
+                            <div class="step-card">
+                                <span class="step-dot">1</span>
+                                <span class="step-copy">解析场景资产</span>
+                            </div>
+                            <div class="step-card">
+                                <span class="step-dot">2</span>
+                                <span class="step-copy">播放并录制</span>
+                            </div>
+                            <div class="step-card">
+                                <span class="step-dot">3</span>
+                                <span class="step-copy">下载成片</span>
+                            </div>
+                        </div>
                         <button id="generateBtn" class="btn-green btn-tall">第一步: 解析场景资产 (获取视频/配音)</button>
                         <div class="action-row">
-                            <button id="playRecordBtn" class="btn-red btn-tall" style="flex:1;" disabled>第二步: 播放并录制</button>
-                            <button id="downloadBtn" class="btn-tall" style="flex:1;" disabled>第三步: 下载合并视频</button>
+                            <button id="playRecordBtn" class="btn-red btn-tall" disabled>第二步: 播放并录制</button>
+                            <button id="downloadBtn" class="btn-tall" disabled>第三步: 下载合并视频</button>
                         </div>
                         <div class="action-row">
-                            <button id="downloadScenesBtn" class="btn-tall" style="flex:1;" disabled>下载每个场景视频</button>
+                            <button id="downloadScenesBtn" class="btn-tall" disabled>下载每个场景视频</button>
                         </div>
                         <div id="statusLog" class="status-log">等待操作...</div>
                     </div>
@@ -1062,10 +1293,16 @@
             </div>
 
             <div class="panel left-panel">
-                <h2>全局设置</h2>
+                <h2 class="panel-headline">
+                    <div class="panel-title-wrap">
+                        <span>全局设置</span>
+                        <span class="panel-subtitle">先配置素材与样式，再进行场景编排</span>
+                    </div>
+                </h2>
 
                 <div class="panel-section">
-                    <h3>素材 &amp; 音频</h3>
+                    <h3>1. 素材 &amp; 音频</h3>
+                    <div class="panel-hint">配置 API Key、画幅比例与背景音乐库，影响所有场景。</div>
                     <div class="ctrl-group">
                         <label style="color:var(--accent)">Pexels API Key (必填)</label>
                         <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
@@ -1099,7 +1336,8 @@
                 </div>
 
                 <div class="panel-section">
-                    <h3>主字幕样式</h3>
+                    <h3>2. 主字幕样式</h3>
+                    <div class="panel-hint">主字幕样式会应用到整段视频，建议在录制前统一校准。</div>
                     <div class="ctrl-group">
                         <label>字体库</label>
                         <select id="fontFamily">
@@ -1144,8 +1382,9 @@
                         <span>场景编排轨道</span>
                         <span class="panel-subtitle" id="sceneDurationSummary">总时长预估: 00:00</span>
                     </div>
-                    <button onclick="addScene()" class="btn-green btn-compact">+ 添加场景</button>
+                    <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
                 </h2>
+                <div class="panel-hint">每个场景支持自动取素材或本地上传。时长填 0 时按配音/视频自动估算。</div>
                 <div id="scenesContainer"></div>
                 <div class="timeline-overview">
                     <div class="timeline-head">
