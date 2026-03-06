@@ -206,6 +206,32 @@
             height: 38px;
         }
 
+        .hex-input {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            text-transform: lowercase;
+        }
+
+        .color-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .color-preset-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 7px;
+            border: 1px solid rgba(255, 255, 255, 0.42);
+            padding: 0;
+            min-width: 24px;
+            min-height: 24px;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+        }
+
+        .color-preset-btn:hover:not(:disabled) {
+            transform: translateY(-1px) scale(1.03);
+        }
+
         button {
             border: none;
             border-radius: 9px;
@@ -677,6 +703,23 @@
                     <input type="color" id="fontColor" value="#ffffff">
                 </div>
             </div>
+            <div class="ctrl-group">
+                <label>字体 HEX 颜色值</label>
+                <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
+            </div>
+            <div class="ctrl-group">
+                <label>常用字幕颜色</label>
+                <div id="fontColorPresetBar" class="color-presets"></div>
+            </div>
+            <div class="ctrl-group">
+                <label>字幕样式预设</label>
+                <select id="subtitleStylePreset">
+                    <option value="classic">经典白字</option>
+                    <option value="film">电影黄字</option>
+                    <option value="neon">霓虹青字</option>
+                    <option value="warning">警示红字</option>
+                </select>
+            </div>
         </div>
 
         <div class="panel middle-panel">
@@ -709,7 +752,7 @@
 
             <div class="workspace">
                 <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
-                    <video id="mediaPlayer" class="preview-media" muted crossOrigin="anonymous" playsinline></video>
+                    <video id="mediaPlayer" class="preview-media" muted playsinline></video>
                     <div id="mainSubtitle"></div>
                     <div id="textLayer"></div>
                 </div>
@@ -733,7 +776,21 @@
                 </div>
                 <div class="ctrl-group">
                     <label>HEX 颜色值</label>
-                    <input id="textEditHex" type="text" value="#ffffff" placeholder="#RRGGBB" disabled>
+                    <input id="textEditHex" class="hex-input" type="text" value="#ffffff" placeholder="#RRGGBB" disabled>
+                </div>
+                <div class="ctrl-group">
+                    <label>常用文字颜色</label>
+                    <div id="textColorPresetBar" class="color-presets"></div>
+                </div>
+                <div class="ctrl-group">
+                    <label>文字样式预设</label>
+                    <select id="textStylePreset" disabled>
+                        <option value="custom">自定义</option>
+                        <option value="title">标题白字</option>
+                        <option value="gold">电商金字</option>
+                        <option value="neon">科技青字</option>
+                        <option value="alert">警示红字</option>
+                    </select>
                 </div>
                 <div class="row">
                     <div class="ctrl-group">
@@ -787,6 +844,10 @@
             return `#${hex.toLowerCase()}`;
         }
 
+        function isRemoteHttpUrl(url) {
+            return /^https?:\/\//i.test(String(url || ''));
+        }
+
         function updatePreviewFrameSize() {
             if (!DOM.workspace || !DOM.preview) return;
             const [w, h] = document.getElementById('videoSize').value.split(',').map(Number);
@@ -834,6 +895,7 @@
             activeBgmSources: [],
             sceneTimer: null,
             objectUrls: [],
+            subtitleStyleKey: 'classic',
             dragState: { box: null, startX: 0, startY: 0, startL: 0, startT: 0 },
             resizeState: { box: null, startX: 0, startY: 0, startSize: 24 }
         };
@@ -858,8 +920,14 @@
             textEditColor: document.getElementById('textEditColor'),
             textEditSize: document.getElementById('textEditSize'),
             textEditHex: document.getElementById('textEditHex'),
+            textStylePreset: document.getElementById('textStylePreset'),
+            textColorPresetBar: document.getElementById('textColorPresetBar'),
             textEditX: document.getElementById('textEditX'),
             textEditY: document.getElementById('textEditY'),
+            fontColor: document.getElementById('fontColor'),
+            fontColorHex: document.getElementById('fontColorHex'),
+            fontColorPresetBar: document.getElementById('fontColorPresetBar'),
+            subtitleStylePreset: document.getElementById('subtitleStylePreset'),
             sceneDurationSummary: document.getElementById('sceneDurationSummary'),
             timelineTrack: document.getElementById('timelineTrack'),
             timelineTotal: document.getElementById('timelineTotal'),
@@ -867,6 +935,53 @@
             playRecordBtn: document.getElementById('playRecordBtn'),
             downloadBtn: document.getElementById('downloadBtn'),
             downloadScenesBtn: document.getElementById('downloadScenesBtn')
+        };
+
+        const COMMON_COLOR_PRESETS = [
+            '#ffffff', '#f8e36a', '#00f5ff', '#ffd1dc', '#ff6f61',
+            '#7cff8f', '#6da8ff', '#ff8a00', '#e9d5ff', '#121212'
+        ];
+
+        const SUBTITLE_STYLE_PRESETS = {
+            classic: {
+                boxColor: 'rgba(0, 0, 0, 0.46)',
+                shadowColor: 'rgba(0, 0, 0, 0.8)',
+                shadowBlur: 9,
+                strokeColor: 'rgba(0, 0, 0, 0.72)',
+                strokeWidth: 3,
+                color: '#ffffff'
+            },
+            film: {
+                boxColor: 'rgba(18, 14, 4, 0.54)',
+                shadowColor: 'rgba(0, 0, 0, 0.88)',
+                shadowBlur: 11,
+                strokeColor: 'rgba(32, 20, 0, 0.9)',
+                strokeWidth: 3.2,
+                color: '#f8e36a'
+            },
+            neon: {
+                boxColor: 'rgba(0, 18, 22, 0.56)',
+                shadowColor: 'rgba(0, 245, 255, 0.55)',
+                shadowBlur: 13,
+                strokeColor: 'rgba(0, 0, 0, 0.78)',
+                strokeWidth: 2.8,
+                color: '#00f5ff'
+            },
+            warning: {
+                boxColor: 'rgba(32, 0, 0, 0.56)',
+                shadowColor: 'rgba(255, 70, 70, 0.56)',
+                shadowBlur: 12,
+                strokeColor: 'rgba(34, 0, 0, 0.92)',
+                strokeWidth: 3.2,
+                color: '#ff6f61'
+            }
+        };
+
+        const TEXT_STYLE_PRESETS = {
+            title: { color: '#ffffff', size: 54 },
+            gold: { color: '#f8e36a', size: 48 },
+            neon: { color: '#00f5ff', size: 46 },
+            alert: { color: '#ff6f61', size: 50 }
         };
 
         function log(msg, level = 'info') {
@@ -976,6 +1091,7 @@
             clearTimeout(Engine.sceneTimer);
             Engine.sceneTimer = null;
             DOM.player.oncanplay = null;
+            DOM.player.onloadeddata = null;
             DOM.player.onended = null;
             DOM.player.onerror = null;
             if (Engine.activeVoice) {
@@ -1162,6 +1278,7 @@
             DOM.textEditHex.disabled = disabled;
             DOM.textEditX.disabled = disabled;
             DOM.textEditY.disabled = disabled;
+            DOM.textStylePreset.disabled = disabled;
 
             if (disabled) {
                 DOM.textEditContent.value = '';
@@ -1170,6 +1287,7 @@
                 DOM.textEditHex.value = '#ffffff';
                 DOM.textEditX.value = 30;
                 DOM.textEditY.value = 30;
+                DOM.textStylePreset.value = 'custom';
                 return;
             }
 
@@ -1177,6 +1295,7 @@
             DOM.textEditColor.value = activeTextBox.color;
             DOM.textEditSize.value = Math.round(activeTextBox.size);
             DOM.textEditHex.value = activeTextBox.color;
+            DOM.textStylePreset.value = 'custom';
             syncActiveTextPositionInputs();
         }
 
@@ -1184,6 +1303,55 @@
             if (!activeTextBox) return;
             DOM.textEditX.value = formatPct(activeTextBox.x_pct * 100);
             DOM.textEditY.value = formatPct(activeTextBox.y_pct * 100);
+        }
+
+        function renderColorPresetBar(container, onPick) {
+            if (!container) return;
+            container.innerHTML = '';
+            COMMON_COLOR_PRESETS.forEach((color) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'color-preset-btn';
+                btn.style.background = color;
+                btn.title = color;
+                btn.setAttribute('aria-label', `使用颜色 ${color}`);
+                btn.addEventListener('click', () => onPick(color));
+                container.appendChild(btn);
+            });
+        }
+
+        function getActiveSubtitleStyle() {
+            return SUBTITLE_STYLE_PRESETS[Engine.subtitleStyleKey] || SUBTITLE_STYLE_PRESETS.classic;
+        }
+
+        function setMainFontColor(raw) {
+            const normalized = normalizeHexColor(raw);
+            if (!normalized) return false;
+            DOM.fontColor.value = normalized;
+            DOM.fontColorHex.value = normalized;
+            applySubtitlePreviewStyle();
+            return true;
+        }
+
+        function applySubtitleStylePreset(key, applyColor = true) {
+            if (!SUBTITLE_STYLE_PRESETS[key]) key = 'classic';
+            Engine.subtitleStyleKey = key;
+            if (DOM.subtitleStylePreset.value !== key) DOM.subtitleStylePreset.value = key;
+            if (applyColor) setMainFontColor(SUBTITLE_STYLE_PRESETS[key].color);
+            applySubtitlePreviewStyle();
+        }
+
+        function applyActiveTextPreset(presetKey) {
+            if (!activeTextBox) return;
+            const preset = TEXT_STYLE_PRESETS[presetKey];
+            if (!preset) return;
+            activeTextBox.color = preset.color;
+            activeTextBox.size = preset.size;
+            DOM.textEditColor.value = preset.color;
+            DOM.textEditHex.value = preset.color;
+            DOM.textEditSize.value = Math.round(preset.size);
+            applyTextStyle(activeTextBox);
+            applyTextPositionFromPct(activeTextBox);
         }
 
         function selectTextBox(txtObj) {
@@ -1372,6 +1540,7 @@
             if (!activeTextBox) return;
             activeTextBox.color = e.target.value;
             DOM.textEditHex.value = activeTextBox.color;
+            DOM.textStylePreset.value = 'custom';
             applyTextStyle(activeTextBox);
         });
 
@@ -1379,6 +1548,7 @@
             if (!activeTextBox) return;
             const size = clampNum(Number(e.target.value), 12, 300);
             activeTextBox.size = size;
+            DOM.textStylePreset.value = 'custom';
             applyTextStyle(activeTextBox);
             applyTextPositionFromPct(activeTextBox);
         });
@@ -1389,6 +1559,7 @@
             if (!normalized) return;
             activeTextBox.color = normalized;
             DOM.textEditColor.value = normalized;
+            DOM.textStylePreset.value = 'custom';
             applyTextStyle(activeTextBox);
         });
 
@@ -1412,16 +1583,54 @@
             applyTextPositionFromPct(activeTextBox);
         });
 
+        DOM.textStylePreset.addEventListener('change', (e) => {
+            if (e.target.value === 'custom') return;
+            applyActiveTextPreset(e.target.value);
+        });
+
+        renderColorPresetBar(DOM.textColorPresetBar, (color) => {
+            if (!activeTextBox) return;
+            activeTextBox.color = color;
+            DOM.textEditColor.value = color;
+            DOM.textEditHex.value = color;
+            DOM.textStylePreset.value = 'custom';
+            applyTextStyle(activeTextBox);
+        });
+
+        renderColorPresetBar(DOM.fontColorPresetBar, (color) => {
+            setMainFontColor(color);
+        });
+
         function applySubtitlePreviewStyle() {
+            const stylePreset = getActiveSubtitleStyle();
             DOM.subtitle.style.fontSize = `${Math.max(16, Number(document.getElementById('fontSize').value) * 0.45)}px`;
-            DOM.subtitle.style.color = document.getElementById('fontColor').value;
+            DOM.subtitle.style.color = DOM.fontColor.value;
             DOM.subtitle.style.fontFamily = document.getElementById('fontFamily').value;
+            DOM.subtitle.style.textShadow = `0 2px ${Math.max(6, stylePreset.shadowBlur)}px ${stylePreset.shadowColor}`;
             Engine.textBoxes.forEach(applyTextStyle);
         }
 
-        ['fontSize', 'fontColor', 'fontFamily'].forEach((id) => {
+        ['fontSize', 'fontFamily'].forEach((id) => {
             document.getElementById(id).addEventListener('input', applySubtitlePreviewStyle);
             document.getElementById(id).addEventListener('change', applySubtitlePreviewStyle);
+        });
+
+        DOM.fontColor.addEventListener('input', (e) => {
+            setMainFontColor(e.target.value);
+        });
+        DOM.fontColor.addEventListener('change', (e) => {
+            setMainFontColor(e.target.value);
+        });
+
+        DOM.fontColorHex.addEventListener('input', (e) => {
+            setMainFontColor(e.target.value);
+        });
+        DOM.fontColorHex.addEventListener('blur', () => {
+            DOM.fontColorHex.value = normalizeHexColor(DOM.fontColorHex.value) || DOM.fontColor.value;
+        });
+
+        DOM.subtitleStylePreset.addEventListener('change', (e) => {
+            applySubtitleStylePreset(e.target.value, true);
         });
 
         function getPreferredMimeType() {
@@ -1430,10 +1639,30 @@
                 'video/webm;codecs=vp9,opus',
                 'video/webm;codecs=vp8,opus',
                 'video/webm;codecs=vp8',
-                'video/webm',
-                'video/mp4'
+                'video/webm'
             ];
             return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        function createMediaRecorderForStream(stream) {
+            const mimeType = getPreferredMimeType();
+            if (!mimeType) return new MediaRecorder(stream);
+            try {
+                return new MediaRecorder(stream, { mimeType });
+            } catch (err) {
+                console.warn(`MediaRecorder 初始化 ${mimeType} 失败，降级为浏览器默认。`, err);
+                return new MediaRecorder(stream);
+            }
+        }
+
+        function requestRecorderStop(recorder, delayMs = 80) {
+            if (!recorder || recorder.state === 'inactive') return;
+            try { recorder.requestData(); } catch (e) {}
+            setTimeout(() => {
+                if (recorder.state !== 'inactive') {
+                    try { recorder.stop(); } catch (err) {}
+                }
+            }, delayMs);
         }
 
         async function getVideoDuration(url) {
@@ -1449,22 +1678,55 @@
                 };
 
                 probe.preload = 'metadata';
-                probe.crossOrigin = 'anonymous';
                 probe.onloadedmetadata = () => {
                     const duration = Number.isFinite(probe.duration) && probe.duration > 0 ? probe.duration : 4;
                     finalize(duration);
                 };
                 probe.onerror = () => finalize(4);
                 probe.src = url;
+                probe.load();
                 setTimeout(() => finalize(4), 7000);
             });
         }
 
-        async function tryDecodeAudioFromUrl(url) {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('音频请求失败');
+        async function fetchRemoteAssetToObjectUrl(url) {
+            if (!isRemoteHttpUrl(url)) return { url, fromRemote: false };
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`请求失败(${res.status})`);
+            const blob = await res.blob();
+            if (!blob.size) throw new Error('返回空数据');
+            const localUrl = URL.createObjectURL(blob);
+            Engine.objectUrls.push(localUrl);
+            return { url: localUrl, fromRemote: true, blob };
+        }
+
+        async function tryDecodeAudioArrayBuffer(arr) {
+            try {
+                return await Engine.audioCtx.decodeAudioData(arr.slice(0));
+            } catch (err) {
+                return null;
+            }
+        }
+
+        async function fetchAudioAssetFromUrl(url) {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`音频请求失败(${res.status})`);
             const arr = await res.arrayBuffer();
-            return await Engine.audioCtx.decodeAudioData(arr);
+            const decoded = await tryDecodeAudioArrayBuffer(arr);
+            const mimeType = res.headers.get('content-type') || 'audio/mpeg';
+            const blob = new Blob([arr], { type: mimeType.includes('audio') ? mimeType : 'audio/mpeg' });
+            const blobUrl = URL.createObjectURL(blob);
+            Engine.objectUrls.push(blobUrl);
+
+            let duration = decoded ? (decoded.duration || 0) : 0;
+            if (!duration) {
+                duration = await getAudioDuration(blobUrl);
+            }
+            return {
+                audioBuffer: decoded,
+                audioUrl: blobUrl,
+                duration: duration || 0
+            };
         }
 
         async function getAudioDuration(url) {
@@ -1480,13 +1742,13 @@
                 };
 
                 probe.preload = 'metadata';
-                probe.crossOrigin = 'anonymous';
                 probe.onloadedmetadata = () => {
                     const duration = Number.isFinite(probe.duration) && probe.duration > 0 ? probe.duration : 0;
                     finalize(duration);
                 };
                 probe.onerror = () => finalize(0);
                 probe.src = url;
+                probe.load();
                 setTimeout(() => finalize(0), 7000);
             });
         }
@@ -1494,16 +1756,19 @@
         function buildTtsCandidateUrls(text, voiceId) {
             const baiduUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${voiceId}`;
             const seVoiceMap = {
-                '0': 'Zhiyu',
-                '1': 'Yunxi',
-                '3': 'Yunjian',
-                '4': 'Xiaoxiao'
+                '0': ['Zhiyu', 'zh-CN-XiaoxiaoNeural'],
+                '1': ['zh-CN-YunxiNeural', 'Zhiyu'],
+                '3': ['zh-CN-YunjianNeural', 'Zhiyu'],
+                '4': ['zh-CN-XiaoxiaoNeural', 'Zhiyu']
             };
-            const seVoice = seVoiceMap[voiceId] || 'Zhiyu';
+            const seVoices = seVoiceMap[voiceId] || ['Zhiyu'];
+            const seUrls = seVoices.map(voice => (
+                `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`
+            ));
             return [
                 `https://api.allorigins.win/raw?url=${encodeURIComponent(baiduUrl)}`,
                 baiduUrl,
-                `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(seVoice)}&text=${encodeURIComponent(text)}`
+                ...seUrls
             ];
         }
 
@@ -1512,12 +1777,8 @@
 
             for (const candidate of candidates) {
                 try {
-                    const audioBuffer = await tryDecodeAudioFromUrl(candidate);
-                    return {
-                        audioBuffer,
-                        audioUrl: candidate,
-                        duration: audioBuffer.duration || 0
-                    };
+                    const asset = await fetchAudioAssetFromUrl(candidate);
+                    if (asset.audioBuffer || asset.duration > 0) return asset;
                 } catch (err) {
                     console.warn('TTS 解码失败:', candidate);
                 }
@@ -1536,7 +1797,7 @@
 
             return {
                 audioBuffer: null,
-                audioUrl: candidates[1] || candidates[0] || null,
+                audioUrl: null,
                 duration: 0
             };
         }
@@ -1761,13 +2022,23 @@
                     }
                     if (!videoUrl) throw new Error(`场景 ${idx + 1} 未找到可用视频。`);
 
+                    if (isRemoteHttpUrl(videoUrl)) {
+                        try {
+                            const cachedVideo = await fetchRemoteAssetToObjectUrl(videoUrl);
+                            videoUrl = cachedVideo.url;
+                        } catch (err) {
+                            log(`场景 ${idx + 1} 视频走直连模式（可能受跨域限制）。`);
+                        }
+                    }
+
                     const ttsPromise = draft.text
                         ? fetchTTSAsset(draft.text, draft.voiceId)
                         : Promise.resolve({ audioBuffer: null, audioUrl: null, duration: 0 });
                     const videoDurationPromise = getVideoDuration(videoUrl);
                     const [ttsAsset, videoDurationRaw] = await Promise.all([ttsPromise, videoDurationPromise]);
 
-                    const ttsDuration = ttsAsset.duration || 0;
+                    const estimatedSpeechDuration = draft.text ? clampNum(draft.text.length / 4.2, 1.6, 45) : 0;
+                    const ttsDuration = ttsAsset.duration || estimatedSpeechDuration || 0;
                     const videoDuration = Math.max(1, videoDurationRaw || 4);
                     const autoDuration = ttsDuration || videoDuration || 4;
                     const duration = draft.hasCustomDuration ? draft.customDuration : autoDuration;
@@ -1835,8 +2106,7 @@
                 startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
                 const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-                const mimeType = getPreferredMimeType();
-                Engine.mediaRecorder = mimeType ? new MediaRecorder(mixStream, { mimeType }) : new MediaRecorder(mixStream);
+                Engine.mediaRecorder = createMediaRecorderForStream(mixStream);
             } catch (err) {
                 console.error(err);
                 stopBgmSources();
@@ -1857,7 +2127,7 @@
                 log('录制器发生错误，正在停止录制。', 'error');
                 setStatus('录制失败', 'error');
                 if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
-                    try { Engine.mediaRecorder.stop(); } catch (stopErr) {}
+                    requestRecorderStop(Engine.mediaRecorder, 0);
                 }
             };
 
@@ -1889,7 +2159,7 @@
             };
 
             try {
-                Engine.mediaRecorder.start(300);
+                Engine.mediaRecorder.start(180);
             } catch (err) {
                 console.error(err);
                 stopBgmSources();
@@ -1911,7 +2181,7 @@
             if (Engine.currentIdx >= Engine.scenes.length) {
                 Engine.isPlaying = false;
                 if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
-                    Engine.mediaRecorder.stop();
+                    requestRecorderStop(Engine.mediaRecorder);
                 }
                 return;
             }
@@ -1923,6 +2193,7 @@
             DOM.player.style.display = 'block';
             DOM.player.loop = scene.duration > (scene.videoDuration || 0) + 0.05;
             DOM.player.src = scene.videoUrl;
+            DOM.player.load();
             DOM.subtitle.innerText = scene.text || '';
             applySubtitlePreviewStyle();
 
@@ -1949,7 +2220,7 @@
                 advance();
             };
 
-            DOM.player.oncanplay = async () => {
+            const startScenePlayback = async () => {
                 if (sceneStarted) return;
                 sceneStarted = true;
                 clearTimeout(loadWatchdog);
@@ -1966,11 +2237,15 @@
                         if (!scene.hasCustomDuration) advance();
                     };
                     Engine.sceneTimer = setTimeout(advance, (scene.duration + 0.15) * 1000);
-                    voice.start(0);
+                    try {
+                        voice.start(0);
+                    } catch (err) {
+                        log(`场景 ${Engine.currentIdx + 1} 配音播放失败。`, 'error');
+                        if (!scene.hasCustomDuration) advance();
+                    }
                 } else if (scene.ttsUrl) {
                     const voiceEl = new Audio(scene.ttsUrl);
                     voiceEl.preload = 'auto';
-                    voiceEl.crossOrigin = 'anonymous';
                     voiceEl.playsInline = true;
 
                     try {
@@ -2003,6 +2278,8 @@
                     Engine.sceneTimer = setTimeout(advance, scene.duration * 1000);
                 }
             };
+            DOM.player.onloadeddata = startScenePlayback;
+            DOM.player.oncanplay = startScenePlayback;
         }
 
         function splitTextLines(ctx, text, maxWidth, maxLines) {
@@ -2046,11 +2323,14 @@
                     const scale = Math.max(w / vw, h / vh);
                     const dw = vw * scale;
                     const dh = vh * scale;
-                    ctx.drawImage(DOM.player, (w - dw) / 2, (h - dh) / 2, dw, dh);
+                    try {
+                        ctx.drawImage(DOM.player, (w - dw) / 2, (h - dh) / 2, dw, dh);
+                    } catch (err) {}
                 }
             }
 
             if (DOM.subtitle.innerText) {
+                const subtitleStyle = getActiveSubtitleStyle();
                 const fontFamily = document.getElementById('fontFamily').value;
                 const fontSize = Math.max(18, Number(document.getElementById('fontSize').value) || 55);
                 ctx.font = `700 ${fontSize}px ${fontFamily}`;
@@ -2063,17 +2343,22 @@
                 const boxX = (w - boxWidth) / 2;
                 const boxY = h * 0.89 - boxHeight;
 
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.46)';
+                ctx.fillStyle = subtitleStyle.boxColor;
                 ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
 
                 ctx.fillStyle = document.getElementById('fontColor').value;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 9;
+                ctx.shadowColor = subtitleStyle.shadowColor;
+                ctx.shadowBlur = subtitleStyle.shadowBlur;
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = subtitleStyle.strokeWidth;
+                ctx.strokeStyle = subtitleStyle.strokeColor;
 
                 lines.forEach((line, i) => {
-                    ctx.fillText(line, w / 2, boxY + 12 + i * lineHeight);
+                    const lineY = boxY + 12 + i * lineHeight;
+                    ctx.strokeText(line, w / 2, lineY);
+                    ctx.fillText(line, w / 2, lineY);
                 });
 
                 ctx.shadowBlur = 0;
@@ -2126,17 +2411,21 @@
             startBgmSources(dest);
             const vStream = DOM.canvas.captureStream(30);
             const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-            const mimeType = getPreferredMimeType();
-            const recorder = mimeType ? new MediaRecorder(mixStream, { mimeType }) : new MediaRecorder(mixStream);
+            const recorder = createMediaRecorderForStream(mixStream);
 
             return await new Promise((resolve, reject) => {
                 let closed = false;
                 let started = false;
+                let loadWatchdog = null;
                 const closeWithError = (err) => {
                     if (closed) return;
                     closed = true;
+                    if (loadWatchdog) {
+                        clearTimeout(loadWatchdog);
+                        loadWatchdog = null;
+                    }
                     try {
-                        if (recorder.state !== 'inactive') recorder.stop();
+                        if (recorder.state !== 'inactive') requestRecorderStop(recorder, 0);
                     } catch (e) {}
                     clearPlaybackState();
                     stopBgmSources();
@@ -2155,6 +2444,10 @@
                 recorder.onstop = () => {
                     if (closed) return;
                     closed = true;
+                    if (loadWatchdog) {
+                        clearTimeout(loadWatchdog);
+                        loadWatchdog = null;
+                    }
                     clearPlaybackState();
                     stopBgmSources();
                     Engine.isPlaying = false;
@@ -2172,15 +2465,23 @@
                 DOM.player.style.display = 'block';
                 DOM.player.loop = scene.duration > (scene.videoDuration || 0) + 0.05;
                 DOM.player.src = scene.videoUrl;
+                DOM.player.load();
                 DOM.subtitle.innerText = scene.text || '';
                 applySubtitlePreviewStyle();
+                loadWatchdog = setTimeout(() => {
+                    closeWithError(new Error(`场景 ${sceneIndex + 1}/${totalScenes} 视频加载超时。`));
+                }, 12000);
 
                 DOM.player.onerror = () => {
                     closeWithError(new Error(`场景 ${sceneIndex + 1}/${totalScenes} 视频加载失败。`));
                 };
-                DOM.player.oncanplay = async () => {
+                const startSceneRecord = async () => {
                     if (started) return;
                     started = true;
+                    if (loadWatchdog) {
+                        clearTimeout(loadWatchdog);
+                        loadWatchdog = null;
+                    }
                     try {
                         await DOM.player.play();
                     } catch (err) {}
@@ -2191,11 +2492,12 @@
                         voice.connect(dest);
                         voice.connect(Engine.audioCtx.destination);
                         Engine.activeVoice = voice;
-                        try { voice.start(0); } catch (err) {}
+                        try { voice.start(0); } catch (err) {
+                            console.warn(`场景 ${sceneIndex + 1} AudioBuffer 启动失败。`, err);
+                        }
                     } else if (scene.ttsUrl) {
                         const voiceEl = new Audio(scene.ttsUrl);
                         voiceEl.preload = 'auto';
-                        voiceEl.crossOrigin = 'anonymous';
                         voiceEl.playsInline = true;
 
                         try {
@@ -2209,21 +2511,26 @@
 
                         Engine.activeVoiceEl = voiceEl;
                         voiceEl.onerror = () => closeWithError(new Error(`场景 ${sceneIndex + 1} 配音播放失败。`));
-                        try { await voiceEl.play(); } catch (err) {}
+                        try { await voiceEl.play(); } catch (err) {
+                            closeWithError(new Error(`场景 ${sceneIndex + 1} 配音播放失败。`));
+                            return;
+                        }
                     }
 
                     try {
-                        recorder.start(250);
+                        recorder.start(180);
                     } catch (err) {
                         closeWithError(new Error(`场景 ${sceneIndex + 1} 录制启动失败。`));
                         return;
                     }
 
                     Engine.sceneTimer = setTimeout(() => {
-                        if (recorder.state !== 'inactive') recorder.stop();
+                        if (recorder.state !== 'inactive') requestRecorderStop(recorder);
                     }, (scene.duration + 0.22) * 1000);
                     renderLoop();
                 };
+                DOM.player.onloadeddata = startSceneRecord;
+                DOM.player.oncanplay = startSceneRecord;
             });
         }
 
@@ -2280,6 +2587,8 @@
             updatePreviewFrameSize();
             repositionTextBoxes();
         });
+        setMainFontColor(DOM.fontColor.value);
+        applySubtitleStylePreset(DOM.subtitleStylePreset.value, false);
         applySubtitlePreviewStyle();
         syncTextInspector();
         updateSceneCounter();
