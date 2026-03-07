@@ -443,11 +443,12 @@
             grid-column: 1;
         }
 
-        .module-pane {
+        /* 修改为这段新代码 */
+        .panel.module-pane {
             display: none;
         }
 
-        .module-pane.is-active {
+        .panel.module-pane.is-active {
             display: flex;
             animation: paneIn 0.18s ease;
         }
