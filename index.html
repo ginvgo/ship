@@ -9,7 +9,8 @@
             color-scheme: dark;
             --topbar-height: 62px;
             --workflow-height: 56px;
-            --worktop-offset: calc(var(--topbar-height) + var(--workflow-height) + var(--grid-gap) + 6px);
+            --overview-height: 50px;
+            --worktop-offset: calc(var(--topbar-height) + var(--workflow-height) + var(--overview-height) + var(--grid-gap) + 10px);
             --bg: #0a1222;
             --bg-elev: #0f1b30;
             --bg-soft: #152640;
@@ -270,6 +271,40 @@
             backdrop-filter: blur(8px);
         }
 
+        .settings-overview {
+            margin: 8px var(--grid-gap) 0;
+            border-radius: 14px;
+            border: 1px solid var(--panel-border);
+            background: color-mix(in srgb, var(--panel) 82%, transparent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            position: sticky;
+            top: calc(var(--topbar-height) + var(--workflow-height) + 10px);
+            z-index: 23;
+            overflow-x: auto;
+            backdrop-filter: blur(8px);
+        }
+
+        .overview-chip {
+            flex: 0 0 auto;
+            border-radius: 999px;
+            border: 1px solid var(--panel-border);
+            background: var(--surface-muted);
+            color: var(--text-soft);
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 6px 10px;
+            white-space: nowrap;
+        }
+
+        .overview-chip strong {
+            color: var(--text);
+            font-weight: 700;
+            margin-left: 4px;
+        }
+
         .flow-item {
             display: flex;
             align-items: center;
@@ -333,6 +368,11 @@
             gap: 8px;
             padding: 12px 8px;
             overflow: auto;
+            position: sticky;
+            top: var(--worktop-offset);
+            max-height: calc(100vh - var(--worktop-offset) - var(--grid-gap));
+            align-self: start;
+            z-index: 9;
         }
 
         .rail-title {
@@ -402,12 +442,51 @@
             grid-column: 1;
         }
 
-        .left-panel {
-            min-height: 280px;
+        .module-pane {
+            display: none;
         }
 
-        .middle-panel {
-            min-height: 420px;
+        .module-pane.is-active {
+            display: flex;
+            animation: paneIn 0.18s ease;
+        }
+
+        @keyframes paneIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .module-pane-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 10px;
+        }
+
+        .module-pane-title {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .module-pane-title > span:first-child {
+            font-size: 15px;
+            color: var(--text-strong);
+            font-weight: 700;
+        }
+
+        .module-pane-title > span:last-child {
+            font-size: 11px;
+            color: var(--text-soft);
+            font-weight: 600;
         }
 
         .right-panel {
@@ -1098,6 +1177,8 @@
             .tool-rail {
                 gap: 6px;
                 padding: 10px 6px;
+                top: calc(var(--topbar-height) + var(--workflow-height) + 8px);
+                max-height: calc(100vh - var(--topbar-height) - var(--workflow-height) - 20px);
             }
 
             .rail-item {
@@ -1116,12 +1197,7 @@
                 order: 2;
             }
 
-            .left-panel {
-                position: static;
-                max-height: none;
-            }
-
-            .middle-panel,
+            .module-pane,
             .right-panel {
                 min-height: auto;
             }
@@ -1147,6 +1223,10 @@
             .workspace {
                 min-height: 280px;
                 max-height: none;
+            }
+
+            .settings-overview {
+                position: static;
             }
         }
 
@@ -1183,6 +1263,10 @@
                 gap: 6px;
             }
 
+            .settings-overview {
+                margin-top: 6px;
+            }
+
             .studio-shell {
                 grid-template-columns: 1fr;
                 overflow: visible;
@@ -1195,6 +1279,9 @@
                 padding: 8px;
                 gap: 8px;
                 overflow-x: auto;
+                position: sticky;
+                top: calc(var(--topbar-height) + var(--workflow-height) + 10px);
+                max-height: none;
             }
 
             .rail-item {
@@ -1260,69 +1347,153 @@
         </div>
     </div>
 
+    <div class="settings-overview" aria-label="当前设置总览">
+        <span class="overview-chip">模块<strong id="overviewActiveModule">Config</strong></span>
+        <span class="overview-chip">素材<strong id="overviewMedia">未配置</strong></span>
+        <span class="overview-chip">画幅<strong id="overviewSize">16:9</strong></span>
+        <span class="overview-chip">场景<strong id="overviewScenes">1 / 00:00</strong></span>
+        <span class="overview-chip">字幕<strong id="overviewSubtitle">经典白字</strong></span>
+        <span class="overview-chip">音乐<strong id="overviewMusic">0 首</strong></span>
+        <span class="overview-chip">导出<strong id="overviewExport">自动格式</strong></span>
+    </div>
+
     <div class="studio-shell">
         <aside class="tool-rail" aria-label="功能导航">
             <div class="rail-title">快速定位</div>
-            <button class="rail-item active" type="button" onclick="document.querySelector('.right-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+            <button class="rail-item" type="button" data-module="media">
                 <span class="rail-icon">▦</span>
                 <span>Media</span>
             </button>
-            <button class="rail-item" type="button" onclick="document.querySelector('.middle-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+            <button class="rail-item" type="button" data-module="scenes">
                 <span class="rail-icon">◫</span>
                 <span>Scenes</span>
             </button>
-            <button class="rail-item" type="button" onclick="document.querySelector('.left-panel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+            <button class="rail-item active" type="button" data-module="config">
                 <span class="rail-icon">⚙</span>
                 <span>Config</span>
             </button>
-            <button class="rail-item" type="button" onclick="document.querySelector('.text-inspector').scrollIntoView({ behavior: 'smooth', block: 'nearest' })">
+            <button class="rail-item" type="button" data-module="text">
                 <span class="rail-icon">T</span>
                 <span>Text</span>
             </button>
-            <button class="rail-item" type="button" onclick="document.getElementById('bgmInput').focus()">
+            <button class="rail-item" type="button" data-module="music">
                 <span class="rail-icon">♪</span>
                 <span>Music</span>
             </button>
-            <button class="rail-item" type="button" onclick="document.getElementById('generateBtn').scrollIntoView({ behavior: 'smooth', block: 'center' })">
+            <button class="rail-item" type="button" data-module="export">
                 <span class="rail-icon">▶</span>
                 <span>Export</span>
             </button>
         </aside>
 
         <div class="app-grid">
-            <div class="panel right-panel">
-                <div class="monitor-sticky">
-                    <h2 class="panel-headline">
-                        <div class="panel-title-wrap">
-                            <span>可视化监视器</span>
-                            <span class="panel-subtitle">拖拽文本、实时预览字幕与视频画面</span>
+            <div class="left-stack">
+                <div class="panel module-pane" data-module="media">
+                    <div class="module-pane-head">
+                        <div class="module-pane-title">
+                            <span>Media · 素材设置</span>
+                            <span>配置素材源与画幅比例</span>
+                        </div>
+                    </div>
+                    <div class="panel-hint">配置 API Key 与视频画幅，影响素材拉取与最终渲染尺寸。</div>
+                    <div class="ctrl-group">
+                        <label style="color:var(--accent)">Pexels API Key (必填)</label>
+                        <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
+                    </div>
+                    <div class="ctrl-group">
+                        <label>视频导出尺寸</label>
+                        <select id="videoSize" onchange="updatePreviewRatio()">
+                            <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
+                            <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
+                            <option value="1080,1080">1:1 正方形 (1080x1080)</option>
+                            <option value="1200,900">4:3 传统横屏 (1200x900)</option>
+                            <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="panel module-pane is-active" data-module="config">
+                    <div class="module-pane-head">
+                        <div class="module-pane-title">
+                            <span>Config · 字幕样式</span>
+                            <span>统一设置全局字幕视觉风格</span>
+                        </div>
+                    </div>
+                    <div class="panel-section">
+                        <h3>主字幕样式</h3>
+                        <div class="panel-hint">主字幕样式会应用到整段视频，建议在录制前统一校准。</div>
+                        <div class="ctrl-group">
+                            <label>字体库</label>
+                            <select id="fontFamily">
+                                <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                                <option value="SimHei, sans-serif">黑体</option>
+                                <option value="KaiTi, serif">楷体</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="ctrl-group">
+                                <label>字号大小</label>
+                                <input type="number" id="fontSize" value="55" min="16" max="150">
+                            </div>
+                            <div class="ctrl-group">
+                                <label>字体颜色</label>
+                                <input type="color" id="fontColor" value="#ffffff">
+                            </div>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>字体 HEX 颜色值</label>
+                            <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
+                        </div>
+                        <div class="ctrl-group">
+                            <label>常用字幕颜色</label>
+                            <div id="fontColorPresetBar" class="color-presets"></div>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>字幕样式预设</label>
+                            <select id="subtitleStylePreset">
+                                <option value="classic">经典白字</option>
+                                <option value="film">电影黄字</option>
+                                <option value="neon">霓虹青字</option>
+                                <option value="warning">警示红字</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel module-pane" data-module="scenes">
+                    <div class="module-pane-head">
+                        <div class="module-pane-title">
+                            <span>Scenes · 场景编排</span>
+                            <span id="sceneDurationSummary">总时长预估: 00:00</span>
+                        </div>
+                        <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
+                    </div>
+                    <div class="panel-hint">每个场景支持自动取素材或本地上传。时长填 0 时按配音/视频自动估算。</div>
+                    <div id="scenesContainer"></div>
+                    <div class="timeline-overview">
+                        <div class="timeline-head">
+                            <span>时间轴预览</span>
+                            <span id="timelineTotal">00:00</span>
+                        </div>
+                        <div id="timelineTrack" class="timeline-track"></div>
+                        <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
+                    </div>
+                </div>
+
+                <div class="panel module-pane" data-module="text">
+                    <div class="module-pane-head">
+                        <div class="module-pane-title">
+                            <span>Text · 文本编辑</span>
+                            <span>管理自由文本与样式预设</span>
                         </div>
                         <div class="headline-actions">
                             <button onclick="addTextBox()" class="btn-compact">+ 自由文本</button>
                             <button onclick="deleteActiveTextBox()" class="btn-red btn-compact">删文本</button>
                         </div>
-                    </h2>
-                    <div class="monitor-hints">
-                        <span class="hint-chip">双击文本可改字</span>
-                        <span class="hint-chip">拖拽角标可调字号</span>
-                        <span class="hint-chip">Delete 可快速删除</span>
                     </div>
-
-                    <div class="workspace-shell">
-                        <div class="workspace">
-                            <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
-                                <video id="mediaPlayer" class="preview-media" muted playsinline></video>
-                                <div id="mainSubtitle"></div>
-                                <div id="textLayer"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="editor-lower">
                     <div class="text-inspector">
                         <div class="inspector-title">自由文本属性</div>
-                        <div class="inspector-tip">先在预览区点击文本，再进行内容/颜色/位置编辑。</div>
+                        <div class="inspector-tip">先在监视器点击文本，再编辑内容/颜色/位置。</div>
                         <div class="ctrl-group">
                             <label>内容</label>
                             <input id="textEditContent" type="text" placeholder="先在预览区点击一个文本" disabled>
@@ -1366,7 +1537,38 @@
                             </div>
                         </div>
                     </div>
+                </div>
 
+                <div class="panel module-pane" data-module="music">
+                    <div class="module-pane-head">
+                        <div class="module-pane-title">
+                            <span>Music · 背景音乐</span>
+                            <span>音乐库管理与混音音量控制</span>
+                        </div>
+                    </div>
+                    <div class="ctrl-group">
+                        <label>背景音乐库 (可多选)</label>
+                        <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
+                        <div class="bgm-library">
+                            <select id="bgmLibraryList" class="bgm-list" multiple></select>
+                            <div class="bgm-actions">
+                                <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
+                                <button type="button" id="clearBgmBtn">清空音乐库</button>
+                            </div>
+                            <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
+                        </div>
+                        <label>音量调节: <span id="bgmVolVal">15%</span></label>
+                        <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
+                    </div>
+                </div>
+
+                <div class="panel module-pane" data-module="export">
+                    <div class="module-pane-head">
+                        <div class="module-pane-title">
+                            <span>Export · 导出流程</span>
+                            <span>按步骤生成并录制，顶部导航负责下载</span>
+                        </div>
+                    </div>
                     <div class="toolbar-row">
                         <div class="toolbar-title">导出流程</div>
                         <div class="step-grid">
@@ -1387,114 +1589,33 @@
                         <div class="action-row">
                             <button id="playRecordBtn" class="btn-red btn-tall" disabled>第二步: 播放并录制</button>
                         </div>
-                        <div class="panel-hint">下载入口已移动到顶部导航，支持格式切换、合并下载和分场景打包下载。</div>
+                        <div class="panel-hint">下载入口在顶部导航，可选输出格式并支持合并/分场景下载。</div>
                         <div id="statusLog" class="status-log">等待操作...</div>
                     </div>
                 </div>
             </div>
 
-            <div class="left-stack">
-                <div class="panel left-panel">
+            <div class="panel right-panel">
+                <div class="monitor-sticky">
                     <h2 class="panel-headline">
                         <div class="panel-title-wrap">
-                            <span>全局设置</span>
-                            <span class="panel-subtitle">先配置素材与样式，再进行场景编排</span>
+                            <span>可视化监视器</span>
+                            <span class="panel-subtitle">右侧固定，仅负责预览与监视</span>
                         </div>
                     </h2>
-
-                    <div class="panel-section">
-                        <h3>1. 素材 &amp; 音频</h3>
-                        <div class="panel-hint">配置 API Key、画幅比例与背景音乐库，影响所有场景。</div>
-                        <div class="ctrl-group">
-                            <label style="color:var(--accent)">Pexels API Key (必填)</label>
-                            <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
-                        </div>
-
-                        <div class="ctrl-group">
-                            <label>视频导出尺寸</label>
-                            <select id="videoSize" onchange="updatePreviewRatio()">
-                                <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
-                                <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
-                                <option value="1080,1080">1:1 正方形 (1080x1080)</option>
-                                <option value="1200,900">4:3 传统横屏 (1200x900)</option>
-                                <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
-                            </select>
-                        </div>
-
-                        <div class="ctrl-group">
-                            <label>背景音乐库 (可多选)</label>
-                            <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
-                            <div class="bgm-library">
-                                <select id="bgmLibraryList" class="bgm-list" multiple></select>
-                                <div class="bgm-actions">
-                                    <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
-                                    <button type="button" id="clearBgmBtn">清空音乐库</button>
-                                </div>
-                                <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
-                            </div>
-                            <label>音量调节: <span id="bgmVolVal">15%</span></label>
-                            <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
-                        </div>
+                    <div class="monitor-hints">
+                        <span class="hint-chip">双击文本可改字</span>
+                        <span class="hint-chip">拖拽角标可调字号</span>
+                        <span class="hint-chip">Delete 可快速删除</span>
                     </div>
-
-                    <div class="panel-section">
-                        <h3>2. 主字幕样式</h3>
-                        <div class="panel-hint">主字幕样式会应用到整段视频，建议在录制前统一校准。</div>
-                        <div class="ctrl-group">
-                            <label>字体库</label>
-                            <select id="fontFamily">
-                                <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
-                                <option value="SimHei, sans-serif">黑体</option>
-                                <option value="KaiTi, serif">楷体</option>
-                            </select>
-                        </div>
-                        <div class="row">
-                            <div class="ctrl-group">
-                                <label>字号大小</label>
-                                <input type="number" id="fontSize" value="55" min="16" max="150">
-                            </div>
-                            <div class="ctrl-group">
-                                <label>字体颜色</label>
-                                <input type="color" id="fontColor" value="#ffffff">
+                    <div class="workspace-shell">
+                        <div class="workspace">
+                            <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
+                                <video id="mediaPlayer" class="preview-media" muted playsinline></video>
+                                <div id="mainSubtitle"></div>
+                                <div id="textLayer"></div>
                             </div>
                         </div>
-                        <div class="ctrl-group">
-                            <label>字体 HEX 颜色值</label>
-                            <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
-                        </div>
-                        <div class="ctrl-group">
-                            <label>常用字幕颜色</label>
-                            <div id="fontColorPresetBar" class="color-presets"></div>
-                        </div>
-                        <div class="ctrl-group">
-                            <label>字幕样式预设</label>
-                            <select id="subtitleStylePreset">
-                                <option value="classic">经典白字</option>
-                                <option value="film">电影黄字</option>
-                                <option value="neon">霓虹青字</option>
-                                <option value="warning">警示红字</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="panel middle-panel">
-                    <h2 class="panel-headline">
-                        <div class="panel-title-wrap">
-                            <span>场景编排轨道</span>
-                            <span class="panel-subtitle" id="sceneDurationSummary">总时长预估: 00:00</span>
-                        </div>
-                        <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
-                    </h2>
-                    <div class="panel-hint">每个场景支持自动取素材或本地上传。时长填 0 时按配音/视频自动估算。</div>
-                    <div id="scenesContainer"></div>
-                    <div class="timeline-overview">
-                        <div class="timeline-head">
-                            <span>时间轴预览</span>
-                            <span id="timelineTotal">00:00</span>
-                        </div>
-                        <div id="timelineTrack" class="timeline-track"></div>
-                        <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
                     </div>
                 </div>
             </div>
@@ -1508,7 +1629,10 @@
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const THEME_KEY = 'studio_theme';
         if (localStorage.getItem('pexels_key')) pexelsInput.value = localStorage.getItem('pexels_key');
-        function saveKey() { localStorage.setItem('pexels_key', pexelsInput.value.trim()); }
+        function saveKey() {
+            localStorage.setItem('pexels_key', pexelsInput.value.trim());
+            updateSettingsOverview();
+        }
 
         function getInitialTheme() {
             const saved = localStorage.getItem(THEME_KEY);
@@ -1533,11 +1657,33 @@
             });
         }
 
+        const MODULE_LABELS = {
+            media: 'Media',
+            scenes: 'Scenes',
+            config: 'Config',
+            text: 'Text',
+            music: 'Music',
+            export: 'Export'
+        };
+        let currentModuleKey = 'config';
         const railItems = [...document.querySelectorAll('.rail-item')];
+        const modulePanes = [...document.querySelectorAll('.module-pane')];
+
+        function activateModule(moduleKey) {
+            const next = MODULE_LABELS[moduleKey] ? moduleKey : 'config';
+            currentModuleKey = next;
+            railItems.forEach((item) => {
+                item.classList.toggle('active', item.dataset.module === next);
+            });
+            modulePanes.forEach((pane) => {
+                pane.classList.toggle('is-active', pane.dataset.module === next);
+            });
+            updateSettingsOverview();
+        }
+
         railItems.forEach((btn) => {
             btn.addEventListener('click', () => {
-                railItems.forEach(item => item.classList.remove('active'));
-                btn.classList.add('active');
+                activateModule(btn.dataset.module || 'config');
             });
         });
 
@@ -1587,6 +1733,7 @@
             document.getElementById('previewBox').style.aspectRatio = `${w} / ${h}`;
             updatePreviewFrameSize();
             repositionTextBoxes();
+            updateSettingsOverview();
         }
 
         let sceneCount = 0;
@@ -1618,6 +1765,8 @@
         };
 
         const DOM = {
+            railItems,
+            modulePanes,
             log: document.getElementById('statusLog'),
             canvas: document.getElementById('renderCanvas'),
             ctx: document.getElementById('renderCanvas').getContext('2d'),
@@ -1652,7 +1801,14 @@
             playRecordBtn: document.getElementById('playRecordBtn'),
             downloadBtn: document.getElementById('downloadBtn'),
             downloadScenesBtn: document.getElementById('downloadScenesBtn'),
-            outputFormat: document.getElementById('outputFormat')
+            outputFormat: document.getElementById('outputFormat'),
+            overviewActiveModule: document.getElementById('overviewActiveModule'),
+            overviewMedia: document.getElementById('overviewMedia'),
+            overviewSize: document.getElementById('overviewSize'),
+            overviewScenes: document.getElementById('overviewScenes'),
+            overviewSubtitle: document.getElementById('overviewSubtitle'),
+            overviewMusic: document.getElementById('overviewMusic'),
+            overviewExport: document.getElementById('overviewExport')
         };
 
         const COMMON_COLOR_PRESETS = [
@@ -1740,6 +1896,47 @@
             DOM.statusPill.style.borderColor = style.border;
             DOM.statusPill.style.background = style.bg;
             DOM.statusPill.style.color = style.color;
+            updateSettingsOverview();
+        }
+
+        function updateSettingsOverview() {
+            const moduleLabel = MODULE_LABELS[currentModuleKey] || MODULE_LABELS.config;
+            if (DOM.overviewActiveModule) DOM.overviewActiveModule.innerText = moduleLabel;
+
+            const keyVal = (pexelsInput.value || '').trim();
+            if (DOM.overviewMedia) {
+                DOM.overviewMedia.innerText = keyVal ? `已填 Key(${keyVal.length})` : '未配置 Key';
+            }
+
+            if (DOM.overviewSize) {
+                const sizeText = document.getElementById('videoSize')?.selectedOptions?.[0]?.textContent || '';
+                DOM.overviewSize.innerText = sizeText ? sizeText.replace(/\s*\(.+\)$/, '') : '未设置';
+            }
+
+            if (DOM.overviewScenes) {
+                const count = document.querySelectorAll('.scene-card').length;
+                const total = DOM.timelineTotal ? DOM.timelineTotal.innerText : '00:00';
+                DOM.overviewScenes.innerText = `${count} 场 / ${total}`;
+            }
+
+            if (DOM.overviewSubtitle) {
+                const presetText = DOM.subtitleStylePreset?.selectedOptions?.[0]?.textContent || '经典白字';
+                const size = Number(document.getElementById('fontSize')?.value || 0) || 0;
+                DOM.overviewSubtitle.innerText = `${presetText} · ${size}px`;
+            }
+
+            if (DOM.overviewMusic) {
+                const allCount = Engine.bgmLibrary.length;
+                const selectedCount = DOM.bgmLibraryList ? DOM.bgmLibraryList.selectedOptions.length : 0;
+                const vol = Math.round((parseFloat(DOM.bgmVolume?.value || '0') || 0) * 100);
+                DOM.overviewMusic.innerText = `${allCount} 首(${selectedCount}) · ${vol}%`;
+            }
+
+            if (DOM.overviewExport) {
+                const format = DOM.outputFormat?.selectedOptions?.[0]?.textContent || '自动格式';
+                const ready = Engine.mergedBlob ? '可下载' : (Engine.isPlaying ? '录制中' : '未录制');
+                DOM.overviewExport.innerText = `${format} · ${ready}`;
+            }
         }
 
         function formatDurationClock(seconds) {
@@ -1781,6 +1978,7 @@
                 DOM.timelineTrack.innerHTML = '<div class="timeline-empty">暂无场景</div>';
                 DOM.timelineTotal.innerText = '00:00';
                 DOM.sceneDurationSummary.innerText = '总时长预估: 00:00';
+                updateSettingsOverview();
                 return;
             }
 
@@ -1805,12 +2003,14 @@
             const totalLabel = formatDurationClock(total);
             DOM.timelineTotal.innerText = totalLabel;
             DOM.sceneDurationSummary.innerText = `总时长预估: ${totalLabel}`;
+            updateSettingsOverview();
         }
 
         function updateSceneCounter() {
             const count = document.querySelectorAll('.scene-card').length;
             DOM.sceneCounter.innerText = `场景: ${count}`;
             renderTimelinePreview();
+            updateSettingsOverview();
         }
 
         function releaseObjectUrls() {
@@ -1952,6 +2152,7 @@
                 if (prevSelected.has(entry.id)) option.selected = true;
                 DOM.bgmLibraryList.appendChild(option);
             });
+            updateSettingsOverview();
         }
 
         function addBgmFilesToLibrary(fileList) {
@@ -1977,6 +2178,7 @@
                     if (addedIds.includes(opt.value)) opt.selected = true;
                 });
             }
+            updateSettingsOverview();
         }
 
         function getSelectedBgmEntries() {
@@ -1989,17 +2191,22 @@
             if (!selectedIds.size) return;
             Engine.bgmLibrary = Engine.bgmLibrary.filter(item => !selectedIds.has(item.id));
             refreshBgmLibraryList();
+            updateSettingsOverview();
         }
 
         DOM.bgmInput.addEventListener('change', (e) => {
             addBgmFilesToLibrary(e.target.files);
             DOM.bgmInput.value = '';
         });
+        pexelsInput.addEventListener('input', updateSettingsOverview);
         DOM.removeBgmBtn.addEventListener('click', removeSelectedBgmTracks);
         DOM.clearBgmBtn.addEventListener('click', () => {
             Engine.bgmLibrary = [];
             refreshBgmLibraryList();
+            updateSettingsOverview();
         });
+        DOM.bgmLibraryList.addEventListener('change', updateSettingsOverview);
+        DOM.bgmVolume.addEventListener('input', updateSettingsOverview);
 
         function syncTextInspector() {
             const disabled = !activeTextBox;
@@ -2061,6 +2268,7 @@
             DOM.fontColor.value = normalized;
             DOM.fontColorHex.value = normalized;
             applySubtitlePreviewStyle();
+            updateSettingsOverview();
             return true;
         }
 
@@ -2344,6 +2552,8 @@
         ['fontSize', 'fontFamily'].forEach((id) => {
             document.getElementById(id).addEventListener('input', applySubtitlePreviewStyle);
             document.getElementById(id).addEventListener('change', applySubtitlePreviewStyle);
+            document.getElementById(id).addEventListener('input', updateSettingsOverview);
+            document.getElementById(id).addEventListener('change', updateSettingsOverview);
         });
 
         DOM.fontColor.addEventListener('input', (e) => {
@@ -2363,6 +2573,7 @@
         DOM.subtitleStylePreset.addEventListener('change', (e) => {
             applySubtitleStylePreset(e.target.value, true);
         });
+        DOM.outputFormat.addEventListener('change', updateSettingsOverview);
 
         const OUTPUT_FORMAT_LABELS = {
             auto: '自动',
@@ -2871,6 +3082,7 @@
             DOM.playRecordBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
             DOM.downloadBtn.disabled = !Engine.mergedBlob || Engine.isBatchExporting || Engine.isPlaying;
             DOM.downloadScenesBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
+            updateSettingsOverview();
         }
 
         function getDownloadExtByMimeType(mimeType) {
@@ -3714,10 +3926,12 @@
         applySubtitleStylePreset(DOM.subtitleStylePreset.value, false);
         applySubtitlePreviewStyle();
         syncTextInspector();
+        activateModule('config');
         updateSceneCounter();
         updatePreviewRatio();
         refreshBgmLibraryList();
         updateActionButtons();
+        updateSettingsOverview();
     </script>
 </body>
 </html>
