@@ -1604,6 +1604,17 @@
                                 <option value="alert">警示红字</option>
                             </select>
                         </div>
+                        <div class="ctrl-group">
+                            <label>自由文本预设库</label>
+                            <select id="textCustomPresetSelect">
+                                <option value="">选择已保存预设</option>
+                            </select>
+                            <div class="row" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 8px;">
+                                <button type="button" id="saveTextPresetBtn" class="btn-compact">存为预设</button>
+                                <button type="button" id="applyTextPresetBtn" class="btn-compact">插入预设</button>
+                                <button type="button" id="deleteTextPresetBtn" class="btn-red btn-compact">删预设</button>
+                            </div>
+                        </div>
                         <div class="row">
                             <div class="ctrl-group">
                                 <label>X (%)</label>
@@ -1793,6 +1804,7 @@
             scenes: [],
             sceneBuildSignature: '',
             textBoxes: [],
+            textBoxPresets: [],
             audioCtx: null,
             bgmLibrary: [],
             bgmBuffers: [],
@@ -1838,6 +1850,10 @@
             textEditSize: document.getElementById('textEditSize'),
             textEditHex: document.getElementById('textEditHex'),
             textStylePreset: document.getElementById('textStylePreset'),
+            textCustomPresetSelect: document.getElementById('textCustomPresetSelect'),
+            saveTextPresetBtn: document.getElementById('saveTextPresetBtn'),
+            applyTextPresetBtn: document.getElementById('applyTextPresetBtn'),
+            deleteTextPresetBtn: document.getElementById('deleteTextPresetBtn'),
             textColorPresetBar: document.getElementById('textColorPresetBar'),
             textEditX: document.getElementById('textEditX'),
             textEditY: document.getElementById('textEditY'),
@@ -1907,6 +1923,7 @@
             neon: { color: '#00f5ff', size: 46 },
             alert: { color: '#ff6f61', size: 50 }
         };
+        const TEXT_BOX_PRESET_STORAGE_KEY = 'text_box_custom_presets_v1';
 
         function log(msg, level = 'info') {
             DOM.log.innerText = `> ${msg}`;
@@ -2303,6 +2320,7 @@ function addScene() {
                 DOM.textEditX.value = 30;
                 DOM.textEditY.value = 30;
                 DOM.textStylePreset.value = 'custom';
+                refreshTextPresetActionButtons();
                 return;
             }
 
@@ -2312,6 +2330,7 @@ function addScene() {
             DOM.textEditHex.value = activeTextBox.color;
             DOM.textStylePreset.value = 'custom';
             syncActiveTextPositionInputs();
+            refreshTextPresetActionButtons();
         }
 
         function syncActiveTextPositionInputs() {
@@ -2370,6 +2389,141 @@ function addScene() {
             applyTextPositionFromPct(activeTextBox);
         }
 
+        function normalizeTextBoxConfig(raw) {
+            const src = raw && typeof raw === 'object' ? raw : {};
+            return {
+                text: String(src.text || '双击修改').slice(0, 120),
+                color: normalizeHexColor(src.color) || '#ffffff',
+                size: clampNum(Number(src.size), 12, 300),
+                x_pct: clampNum(Number(src.x_pct), 0, 1),
+                y_pct: clampNum(Number(src.y_pct), 0, 1)
+            };
+        }
+
+        function normalizeTextBoxPreset(raw, index = 0) {
+            if (!raw || typeof raw !== 'object') return null;
+            const name = String(raw.name || '').trim().slice(0, 36);
+            if (!name) return null;
+            const cfg = normalizeTextBoxConfig(raw);
+            return {
+                id: String(raw.id || `tp_${Date.now()}_${index}`),
+                name,
+                text: cfg.text,
+                color: cfg.color,
+                size: cfg.size,
+                x_pct: cfg.x_pct,
+                y_pct: cfg.y_pct
+            };
+        }
+
+        function saveTextBoxPresetsToStorage() {
+            try {
+                localStorage.setItem(TEXT_BOX_PRESET_STORAGE_KEY, JSON.stringify(Engine.textBoxPresets));
+            } catch (err) {
+                console.warn('保存自由文本预设失败:', err);
+            }
+        }
+
+        function refreshTextPresetActionButtons() {
+            const hasSelected = Boolean(DOM.textCustomPresetSelect && DOM.textCustomPresetSelect.value);
+            if (DOM.saveTextPresetBtn) DOM.saveTextPresetBtn.disabled = !activeTextBox;
+            if (DOM.applyTextPresetBtn) DOM.applyTextPresetBtn.disabled = !hasSelected;
+            if (DOM.deleteTextPresetBtn) DOM.deleteTextPresetBtn.disabled = !hasSelected;
+        }
+
+        function refreshTextBoxPresetList(preferredId = '') {
+            if (!DOM.textCustomPresetSelect) return;
+            const previous = preferredId || DOM.textCustomPresetSelect.value || '';
+            DOM.textCustomPresetSelect.innerHTML = '<option value="">选择已保存预设</option>';
+            Engine.textBoxPresets.forEach((preset, idx) => {
+                const opt = document.createElement('option');
+                opt.value = preset.id;
+                opt.text = `${idx + 1}. ${preset.name}`;
+                DOM.textCustomPresetSelect.appendChild(opt);
+            });
+            const matched = previous && Engine.textBoxPresets.some(item => item.id === previous);
+            DOM.textCustomPresetSelect.value = matched ? previous : '';
+            refreshTextPresetActionButtons();
+        }
+
+        function loadTextBoxPresetsFromStorage() {
+            let parsed = [];
+            try {
+                parsed = JSON.parse(localStorage.getItem(TEXT_BOX_PRESET_STORAGE_KEY) || '[]');
+            } catch (err) {
+                parsed = [];
+            }
+            if (!Array.isArray(parsed)) parsed = [];
+            Engine.textBoxPresets = parsed
+                .map((item, idx) => normalizeTextBoxPreset(item, idx))
+                .filter(Boolean);
+            refreshTextBoxPresetList();
+        }
+
+        function getSelectedTextBoxPreset() {
+            const selectedId = DOM.textCustomPresetSelect ? DOM.textCustomPresetSelect.value : '';
+            if (!selectedId) return null;
+            return Engine.textBoxPresets.find(item => item.id === selectedId) || null;
+        }
+
+        function saveActiveTextAsPreset() {
+            if (!activeTextBox) {
+                alert('请先在预览区选中一个自由文本。');
+                return;
+            }
+            const defaultName = String(activeTextBox.text || '自由文本预设').trim().slice(0, 16) || '自由文本预设';
+            const inputName = prompt('请输入预设名称：', defaultName);
+            if (inputName === null) return;
+            const name = inputName.trim().slice(0, 36);
+            if (!name) {
+                alert('预设名称不能为空。');
+                return;
+            }
+
+            const cfg = normalizeTextBoxConfig(activeTextBox);
+            const existing = Engine.textBoxPresets.find(item => item.name === name);
+            if (existing) {
+                const shouldOverwrite = confirm(`预设「${name}」已存在，是否覆盖？`);
+                if (!shouldOverwrite) return;
+                Object.assign(existing, cfg, { name });
+                saveTextBoxPresetsToStorage();
+                refreshTextBoxPresetList(existing.id);
+                return;
+            }
+
+            const preset = {
+                id: `tp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                name,
+                text: cfg.text,
+                color: cfg.color,
+                size: cfg.size,
+                x_pct: cfg.x_pct,
+                y_pct: cfg.y_pct
+            };
+            Engine.textBoxPresets.push(preset);
+            saveTextBoxPresetsToStorage();
+            refreshTextBoxPresetList(preset.id);
+        }
+
+        function insertSelectedTextPreset() {
+            const preset = getSelectedTextBoxPreset();
+            if (!preset) {
+                alert('请先在预设库中选择一个预设。');
+                return;
+            }
+            addTextBox(preset);
+        }
+
+        function deleteSelectedTextPreset() {
+            const preset = getSelectedTextBoxPreset();
+            if (!preset) return;
+            const ok = confirm(`确定删除预设「${preset.name}」吗？`);
+            if (!ok) return;
+            Engine.textBoxPresets = Engine.textBoxPresets.filter(item => item.id !== preset.id);
+            saveTextBoxPresetsToStorage();
+            refreshTextBoxPresetList();
+        }
+
         function selectTextBox(txtObj) {
             activeTextBox = txtObj;
             Engine.textBoxes.forEach(item => item.el.classList.remove('active'));
@@ -2403,19 +2557,20 @@ function addScene() {
             Engine.textBoxes.forEach(txt => applyTextPositionFromPct(txt));
         }
 
-        function addTextBox() {
+        function addTextBox(preset = null) {
             const id = `txt_${Date.now()}`;
             const el = document.createElement('div');
+            const cfg = normalizeTextBoxConfig(preset);
             const txtObj = {
                 id,
                 el,
                 contentEl: null,
                 resizeHandle: null,
-                text: '双击修改',
-                x_pct: 0.3,
-                y_pct: 0.3,
-                color: '#ffffff',
-                size: 24
+                text: cfg.text,
+                x_pct: cfg.x_pct,
+                y_pct: cfg.y_pct,
+                color: cfg.color,
+                size: cfg.size
             };
 
             el.className = 'draggable-text';
@@ -2603,6 +2758,18 @@ function addScene() {
             if (e.target.value === 'custom') return;
             applyActiveTextPreset(e.target.value);
         });
+        if (DOM.textCustomPresetSelect) {
+            DOM.textCustomPresetSelect.addEventListener('change', refreshTextPresetActionButtons);
+        }
+        if (DOM.saveTextPresetBtn) {
+            DOM.saveTextPresetBtn.addEventListener('click', saveActiveTextAsPreset);
+        }
+        if (DOM.applyTextPresetBtn) {
+            DOM.applyTextPresetBtn.addEventListener('click', insertSelectedTextPreset);
+        }
+        if (DOM.deleteTextPresetBtn) {
+            DOM.deleteTextPresetBtn.addEventListener('click', deleteSelectedTextPreset);
+        }
 
         renderColorPresetBar(DOM.textColorPresetBar, (color) => {
             if (!activeTextBox) return;
@@ -3930,6 +4097,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
         setMainFontColor(DOM.fontColor.value);
         applySubtitleStylePreset(DOM.subtitleStylePreset.value, false);
         applySubtitlePreviewStyle();
+        loadTextBoxPresetsFromStorage();
         syncTextInspector();
         activateModule('config');
         updateSceneCounter();
