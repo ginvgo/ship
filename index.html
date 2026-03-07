@@ -3213,20 +3213,20 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             Engine.mergedBlob = null;
             Engine.currentRecorderMimeType = '';
 
-            const dest = Engine.audioCtx.createMediaStreamDestination();
+const dest = Engine.audioCtx.createMediaStreamDestination();
             let mixStream = null;
             let recorderSetup = null;
             try {
                 startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
-                mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                
+                // 【修复】分场景导出时同样要过滤空音轨
+                const audioTracks = (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) ? dest.stream.getAudioTracks() : [];
+                mixStream = new MediaStream([...vStream.getVideoTracks(), ...audioTracks]);
+                
                 recorderSetup = createMediaRecorderForStream(mixStream);
-                Engine.mediaRecorder = recorderSetup.recorder;
-                Engine.currentRecorderMimeType = recorderSetup.mimeType || 'video/webm';
-                if (recorderSetup.fallbackUsed) {
-                    log(`所选格式 ${recorderSetup.requestedLabel} 当前浏览器不可用，已自动切换为 ${recorderSetup.actualContainer.toUpperCase()}。`, 'error');
-                }
             } catch (err) {
+            
                 stopBgmSources();
                 stopStreamTracks(mixStream);
                 Engine.mediaRecorder = null;
@@ -3518,14 +3518,19 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             DOM.canvas.height = h;
             drawBlackFrameToCanvas();
 
-            const dest = Engine.audioCtx.createMediaStreamDestination();
+const dest = Engine.audioCtx.createMediaStreamDestination();
             let mixStream = null;
             let recorderSetup = null;
             try {
                 startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
-                mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                
+                // 【修复】判断是否有音频缓冲数据。如果没有音乐，就不要塞入空的音频轨
+                const audioTracks = (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) ? dest.stream.getAudioTracks() : [];
+                mixStream = new MediaStream([...vStream.getVideoTracks(), ...audioTracks]);
+                
                 recorderSetup = createMediaRecorderForStream(mixStream);
+                
             } catch (err) {
                 stopBgmSources();
                 stopStreamTracks(mixStream);
