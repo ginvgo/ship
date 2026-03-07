@@ -8,9 +8,8 @@
         :root {
             color-scheme: dark;
             --topbar-height: 62px;
-            --workflow-height: 56px;
             --overview-height: 50px;
-            --worktop-offset: calc(var(--topbar-height) + var(--workflow-height) + var(--overview-height) + var(--grid-gap) + 10px);
+            --worktop-offset: calc(var(--topbar-height) + var(--overview-height) + var(--grid-gap) + 10px);
             --bg: #0a1222;
             --bg-elev: #0f1b30;
             --bg-soft: #152640;
@@ -282,7 +281,7 @@
             gap: 8px;
             padding: 8px 10px;
             position: sticky;
-            top: calc(var(--topbar-height) + var(--workflow-height) + 10px);
+            top: calc(var(--topbar-height) + 10px);
             z-index: 23;
             overflow-x: auto;
             backdrop-filter: blur(8px);
@@ -370,8 +369,8 @@
             padding: 12px 8px;
             overflow: auto;
             position: sticky;
-            top: var(--worktop-offset);
-            max-height: calc(100vh - var(--worktop-offset) - var(--grid-gap));
+            top: calc(var(--topbar-height) + var(--overview-height) + 24px); 
+            max-height: calc(100vh - var(--topbar-height) - var(--overview-height) - 40px);
             align-self: start;
             z-index: 9;
         }
@@ -1179,8 +1178,8 @@
             .tool-rail {
                 gap: 6px;
                 padding: 10px 6px;
-                top: calc(var(--topbar-height) + var(--workflow-height) + 8px);
-                max-height: calc(100vh - var(--topbar-height) - var(--workflow-height) - 20px);
+                top: calc(var(--topbar-height) + 8px);
+                max-height: calc(100vh - var(--topbar-height) - 20px);
             }
 
             .rail-item {
@@ -1342,20 +1341,7 @@
         </div>
     </header>
 
-    <div class="workflow-strip" aria-label="工作流程">
-        <div class="flow-item is-active">
-            <span class="flow-index">1</span>
-            <span class="flow-text">配置素材源与字幕样式</span>
-        </div>
-        <div class="flow-item is-active">
-            <span class="flow-index">2</span>
-            <span class="flow-text">编排场景并调整文本</span>
-        </div>
-        <div class="flow-item">
-            <span class="flow-index">3</span>
-            <span class="flow-text">生成并导出最终视频</span>
-        </div>
-    </div>
+    
 
     <div class="settings-overview" aria-label="当前设置总览">
         <span class="overview-chip">模块<strong id="overviewActiveModule">Config</strong></span>
@@ -2816,22 +2802,23 @@
             });
         }
 
-        function buildTtsCandidateUrls(text, voiceId) {
-            const baiduUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${voiceId}`;
-            const seVoiceMap = {
-                '0': ['Zhiyu', 'zh-CN-XiaoxiaoNeural'],
-                '1': ['zh-CN-YunxiNeural', 'Zhiyu'],
-                '3': ['zh-CN-YunjianNeural', 'Zhiyu'],
-                '4': ['zh-CN-XiaoxiaoNeural', 'Zhiyu']
-            };
-            const seVoices = seVoiceMap[voiceId] || ['Zhiyu'];
-            const seUrls = seVoices.map(voice => (
-                `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`
-            ));
+function buildTtsCandidateUrls(text, voiceId) {
+            // 解析映射 voiceId: 1(男), 0(女), 3(情感男), 4(童音)
+            const baiduPer = voiceId === '1' ? 1 : voiceId === '0' ? 0 : voiceId === '3' ? 3 : 4;
+            const baiduUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${baiduPer}`;
+
+            // StreamElements 接口自带 CORS 跨域支持，成功率 99% 
+            // （注：目前国外接口中文最稳定的是 'Zhiyu' 声线）
+            const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Zhiyu&text=${encodeURIComponent(text)}`;
+
+            // 有道 TTS 作为备用通道
+            const youdaoUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&le=zh`;
+
+            // 优先直接使用自带跨域的 StreamElements，如果失败再走代理请求百度/有道
             return [
+                seUrl, 
                 `https://api.allorigins.win/raw?url=${encodeURIComponent(baiduUrl)}`,
-                baiduUrl,
-                ...seUrls
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(youdaoUrl)}`
             ];
         }
 
