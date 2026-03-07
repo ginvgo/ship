@@ -1574,17 +1574,22 @@
 
             <div class="panel right-panel">
                 <div class="monitor-sticky">
-                    <h2 class="panel-headline">
-                        <div class="panel-title-wrap">
-                            <span>可视化监视器</span>
-                            <span class="panel-subtitle">右侧固定，仅负责预览与监视</span>
-                        </div>
+                    <!-- 精简头部，去掉了底边框和多余说明 -->
+                    <h2 class="panel-headline" style="border-bottom: none; padding-bottom: 4px;">
+                        <span>可视化监视器</span>
                     </h2>
-                    <div class="monitor-hints">
-                        <span class="hint-chip">双击文本可改字</span>
-                        <span class="hint-chip">拖拽角标可调字号</span>
-                        <span class="hint-chip">Delete 可快速删除</span>
+                    
+                    <div class="workspace-shell">
+                        <div class="workspace">
+                            <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
+                                <video id="mediaPlayer" class="preview-media" muted playsinline></video>
+                                <div id="mainSubtitle"></div>
+                                <div id="textLayer"></div>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </div>
                     <div class="workspace-shell">
                         <div class="workspace">
                             <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
