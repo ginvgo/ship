@@ -1567,7 +1567,7 @@
                     <div class="workspace-shell">
                         <div class="workspace">
                             <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
-                                <video id="mediaPlayer" class="preview-media" muted playsinline></video>
+                                <video id="mediaPlayer" class="preview-media" crossorigin="anonymous" muted playsinline></video>
                                 <div id="mainSubtitle"></div>
                                 <div id="textLayer"></div>
                             </div>
@@ -2628,9 +2628,9 @@
             };
         }
 
-        function requestRecorderStop(recorder, delayMs = 160) {
+function requestRecorderStop(recorder, delayMs = 150) {
             if (!recorder || recorder.state === 'inactive') return;
-            try { recorder.requestData(); } catch (e) {}
+            // 移除 requestData，直接使用延时 stop，让浏览器自行处理最后的关键帧
             setTimeout(() => {
                 if (recorder.state !== 'inactive') {
                     try { recorder.stop(); } catch (err) {}
@@ -3094,65 +3094,35 @@ function buildTtsCandidateUrls(text, voiceId) {
             return container === 'mp4' ? 0 : 240;
         }
 
-        function startRecorderCapture(recorder, mimeType) {
-            const timeslice = getRecorderTimeslice(mimeType);
-            if (timeslice > 0) {
-                recorder.start(timeslice);
-                return;
-            }
+function startRecorderCapture(recorder, mimeType) {
+            // 移除 Timeslice 切片逻辑，直接整体录制，防止短视频分片丢失
             recorder.start();
         }
 
-        function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
+function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             return new Promise((resolve, reject) => {
-                let stopSeen = false;
-                let settled = false;
-                let finalizeTimer = null;
-
-                const cleanup = () => {
-                    if (finalizeTimer) {
-                        clearTimeout(finalizeTimer);
-                        finalizeTimer = null;
+                recorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) {
+                        Engine.recordedChunks.push(e.data);
+                        chunks.push(e.data);
                     }
-                    recorder.ondataavailable = null;
-                    recorder.onerror = null;
-                    recorder.onstop = null;
                 };
-
-                const finalize = () => {
-                    if (!stopSeen || settled) return;
-                    if (finalizeTimer) clearTimeout(finalizeTimer);
-                    finalizeTimer = setTimeout(() => {
-                        if (settled) return;
-                        settled = true;
-                        cleanup();
+                
+                recorder.onerror = (e) => {
+                    try { if (recorder.state !== 'inactive') recorder.stop(); } catch (err) {}
+                    reject(e?.error instanceof Error ? e.error : new Error('录制器发生错误。'));
+                };
+                
+                recorder.onstop = () => {
+                    // 等待 150ms 确保浏览器底层已将最后一个 ondataavailable 抛出
+                    setTimeout(() => {
                         const blob = buildVideoBlobFromChunks(chunks, fallbackType);
                         if (!blob) {
                             reject(new Error(emptyMessage));
                             return;
                         }
                         resolve(blob);
-                    }, 260);
-                };
-
-                recorder.ondataavailable = (e) => {
-                    if (!e.data) return;
-                    Engine.recordedChunks.push(e.data);
-                    if (e.data.size > 0) chunks.push(e.data);
-                    if (stopSeen) finalize();
-                };
-                recorder.onerror = (e) => {
-                    if (settled) return;
-                    settled = true;
-                    cleanup();
-                    try {
-                        if (recorder.state !== 'inactive') requestRecorderStop(recorder, 0);
-                    } catch (err) {}
-                    reject(e?.error instanceof Error ? e.error : new Error('录制器发生错误。'));
-                };
-                recorder.onstop = () => {
-                    stopSeen = true;
-                    finalize();
+                    }, 150);
                 };
             });
         }
