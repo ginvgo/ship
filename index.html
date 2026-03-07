@@ -389,29 +389,29 @@
             min-height: 0;
             display: grid;
             grid-template-columns: minmax(0, 1fr) clamp(420px, 42vw, 560px);
-            grid-template-rows: auto auto;
-            grid-template-areas:
-                "config preview"
-                "timeline preview";
             gap: var(--grid-gap);
             overflow: visible;
             align-items: start;
         }
 
+        .left-stack {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--grid-gap);
+            grid-column: 1;
+        }
+
         .left-panel {
-            grid-area: config;
             min-height: 280px;
-            overflow: visible;
         }
 
         .middle-panel {
-            grid-area: timeline;
             min-height: 420px;
-            overflow: visible;
         }
 
         .right-panel {
-            grid-area: preview;
+            grid-column: 2;
             position: sticky;
             top: var(--worktop-offset);
             max-height: calc(100vh - var(--worktop-offset) - var(--grid-gap));
@@ -431,11 +431,6 @@
             min-height: 0;
             overflow: auto;
             -webkit-overflow-scrolling: touch;
-        }
-
-        .left-panel.panel,
-        .middle-panel.panel {
-            overflow: visible;
         }
 
         .panel:hover {
@@ -1087,7 +1082,6 @@
         @media (max-width: 1520px) {
             .app-grid {
                 grid-template-columns: minmax(0, 1fr) clamp(390px, 43vw, 500px);
-                grid-template-rows: auto auto;
             }
         }
 
@@ -1114,12 +1108,12 @@
             .app-grid {
                 min-height: auto;
                 grid-template-columns: 1fr;
-                grid-template-rows: auto;
-                grid-template-areas:
-                    "preview"
-                    "config"
-                    "timeline";
                 overflow: visible;
+            }
+
+            .left-stack {
+                grid-column: 1;
+                order: 2;
             }
 
             .left-panel {
@@ -1133,6 +1127,8 @@
             }
 
             .right-panel {
+                grid-column: 1;
+                order: 1;
                 position: static;
                 top: auto;
                 max-height: none;
@@ -1397,107 +1393,109 @@
                 </div>
             </div>
 
-            <div class="panel left-panel">
-                <h2 class="panel-headline">
-                    <div class="panel-title-wrap">
-                        <span>全局设置</span>
-                        <span class="panel-subtitle">先配置素材与样式，再进行场景编排</span>
-                    </div>
-                </h2>
+            <div class="left-stack">
+                <div class="panel left-panel">
+                    <h2 class="panel-headline">
+                        <div class="panel-title-wrap">
+                            <span>全局设置</span>
+                            <span class="panel-subtitle">先配置素材与样式，再进行场景编排</span>
+                        </div>
+                    </h2>
 
-                <div class="panel-section">
-                    <h3>1. 素材 &amp; 音频</h3>
-                    <div class="panel-hint">配置 API Key、画幅比例与背景音乐库，影响所有场景。</div>
-                    <div class="ctrl-group">
-                        <label style="color:var(--accent)">Pexels API Key (必填)</label>
-                        <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
-                    </div>
+                    <div class="panel-section">
+                        <h3>1. 素材 &amp; 音频</h3>
+                        <div class="panel-hint">配置 API Key、画幅比例与背景音乐库，影响所有场景。</div>
+                        <div class="ctrl-group">
+                            <label style="color:var(--accent)">Pexels API Key (必填)</label>
+                            <input type="text" id="pexelsKey" placeholder="在此粘贴 Pexels API Key..." onchange="saveKey()">
+                        </div>
 
-                    <div class="ctrl-group">
-                        <label>视频导出尺寸</label>
-                        <select id="videoSize" onchange="updatePreviewRatio()">
-                            <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
-                            <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
-                            <option value="1080,1080">1:1 正方形 (1080x1080)</option>
-                            <option value="1200,900">4:3 传统横屏 (1200x900)</option>
-                            <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
-                        </select>
-                    </div>
+                        <div class="ctrl-group">
+                            <label>视频导出尺寸</label>
+                            <select id="videoSize" onchange="updatePreviewRatio()">
+                                <option value="1920,1080">16:9 高清横屏 (1920x1080)</option>
+                                <option value="1080,1920">9:16 高清竖屏 (1080x1920)</option>
+                                <option value="1080,1080">1:1 正方形 (1080x1080)</option>
+                                <option value="1200,900">4:3 传统横屏 (1200x900)</option>
+                                <option value="1080,1350">4:5 社交竖屏 (1080x1350)</option>
+                            </select>
+                        </div>
 
-                    <div class="ctrl-group">
-                        <label>背景音乐库 (可多选)</label>
-                        <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
-                        <div class="bgm-library">
-                            <select id="bgmLibraryList" class="bgm-list" multiple></select>
-                            <div class="bgm-actions">
-                                <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
-                                <button type="button" id="clearBgmBtn">清空音乐库</button>
+                        <div class="ctrl-group">
+                            <label>背景音乐库 (可多选)</label>
+                            <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
+                            <div class="bgm-library">
+                                <select id="bgmLibraryList" class="bgm-list" multiple></select>
+                                <div class="bgm-actions">
+                                    <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
+                                    <button type="button" id="clearBgmBtn">清空音乐库</button>
+                                </div>
+                                <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
                             </div>
-                            <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
+                            <label>音量调节: <span id="bgmVolVal">15%</span></label>
+                            <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
                         </div>
-                        <label>音量调节: <span id="bgmVolVal">15%</span></label>
-                        <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
+                    </div>
+
+                    <div class="panel-section">
+                        <h3>2. 主字幕样式</h3>
+                        <div class="panel-hint">主字幕样式会应用到整段视频，建议在录制前统一校准。</div>
+                        <div class="ctrl-group">
+                            <label>字体库</label>
+                            <select id="fontFamily">
+                                <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                                <option value="SimHei, sans-serif">黑体</option>
+                                <option value="KaiTi, serif">楷体</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="ctrl-group">
+                                <label>字号大小</label>
+                                <input type="number" id="fontSize" value="55" min="16" max="150">
+                            </div>
+                            <div class="ctrl-group">
+                                <label>字体颜色</label>
+                                <input type="color" id="fontColor" value="#ffffff">
+                            </div>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>字体 HEX 颜色值</label>
+                            <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
+                        </div>
+                        <div class="ctrl-group">
+                            <label>常用字幕颜色</label>
+                            <div id="fontColorPresetBar" class="color-presets"></div>
+                        </div>
+                        <div class="ctrl-group">
+                            <label>字幕样式预设</label>
+                            <select id="subtitleStylePreset">
+                                <option value="classic">经典白字</option>
+                                <option value="film">电影黄字</option>
+                                <option value="neon">霓虹青字</option>
+                                <option value="warning">警示红字</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div class="panel-section">
-                    <h3>2. 主字幕样式</h3>
-                    <div class="panel-hint">主字幕样式会应用到整段视频，建议在录制前统一校准。</div>
-                    <div class="ctrl-group">
-                        <label>字体库</label>
-                        <select id="fontFamily">
-                            <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
-                            <option value="SimHei, sans-serif">黑体</option>
-                            <option value="KaiTi, serif">楷体</option>
-                        </select>
-                    </div>
-                    <div class="row">
-                        <div class="ctrl-group">
-                            <label>字号大小</label>
-                            <input type="number" id="fontSize" value="55" min="16" max="150">
+                <div class="panel middle-panel">
+                    <h2 class="panel-headline">
+                        <div class="panel-title-wrap">
+                            <span>场景编排轨道</span>
+                            <span class="panel-subtitle" id="sceneDurationSummary">总时长预估: 00:00</span>
                         </div>
-                        <div class="ctrl-group">
-                            <label>字体颜色</label>
-                            <input type="color" id="fontColor" value="#ffffff">
+                        <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
+                    </h2>
+                    <div class="panel-hint">每个场景支持自动取素材或本地上传。时长填 0 时按配音/视频自动估算。</div>
+                    <div id="scenesContainer"></div>
+                    <div class="timeline-overview">
+                        <div class="timeline-head">
+                            <span>时间轴预览</span>
+                            <span id="timelineTotal">00:00</span>
                         </div>
+                        <div id="timelineTrack" class="timeline-track"></div>
+                        <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
                     </div>
-                    <div class="ctrl-group">
-                        <label>字体 HEX 颜色值</label>
-                        <input type="text" id="fontColorHex" class="hex-input" value="#ffffff" placeholder="#RRGGBB">
-                    </div>
-                    <div class="ctrl-group">
-                        <label>常用字幕颜色</label>
-                        <div id="fontColorPresetBar" class="color-presets"></div>
-                    </div>
-                    <div class="ctrl-group">
-                        <label>字幕样式预设</label>
-                        <select id="subtitleStylePreset">
-                            <option value="classic">经典白字</option>
-                            <option value="film">电影黄字</option>
-                            <option value="neon">霓虹青字</option>
-                            <option value="warning">警示红字</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="panel middle-panel">
-                <h2 class="panel-headline">
-                    <div class="panel-title-wrap">
-                        <span>场景编排轨道</span>
-                        <span class="panel-subtitle" id="sceneDurationSummary">总时长预估: 00:00</span>
-                    </div>
-                    <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
-                </h2>
-                <div class="panel-hint">每个场景支持自动取素材或本地上传。时长填 0 时按配音/视频自动估算。</div>
-                <div id="scenesContainer"></div>
-                <div class="timeline-overview">
-                    <div class="timeline-head">
-                        <span>时间轴预览</span>
-                        <span id="timelineTotal">00:00</span>
-                    </div>
-                    <div id="timelineTrack" class="timeline-track"></div>
-                    <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
                 </div>
             </div>
         </div>
