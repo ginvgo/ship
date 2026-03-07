@@ -1325,8 +1325,8 @@
             <span id="statusLog" style="font-size: 12px; font-weight: bold; color: var(--success);">等待操作...</span>
             
             <!-- 【新增】2. 原先的步骤按钮移至此处，并改用小型紧凑的样式 -->
-            <button id="generateBtn" class="mini-download" style="background: linear-gradient(135deg, #11a47f, #2bd7a7);">1. 解析资产</button>
-            <button id="playRecordBtn" class="mini-download secondary" disabled>2. 播放录制</button>
+            <button id="generateBtn" class="mini-download" style="background: linear-gradient(135deg, #11a47f, #2bd7a7);">生成视频</button>
+            <button id="playRecordBtn" class="mini-download secondary" disabled>重新生成</button>
 
             <button type="button" id="themeToggleBtn" class="theme-toggle" aria-label="切换亮暗主题">切换明亮</button>
             <div class="download-nav" aria-label="下载导航">
@@ -1353,7 +1353,7 @@
         </div>
         <div class="flow-item">
             <span class="flow-index">3</span>
-            <span class="flow-text">录制并导出最终视频</span>
+            <span class="flow-text">生成并导出最终视频</span>
         </div>
     </div>
 
@@ -1722,6 +1722,7 @@
 
         const Engine = {
             scenes: [],
+            sceneBuildSignature: '',
             textBoxes: [],
             audioCtx: null,
             bgmLibrary: [],
@@ -1915,7 +1916,9 @@
 
             if (DOM.overviewExport) {
                 const format = DOM.outputFormat?.selectedOptions?.[0]?.textContent || '自动格式';
-                const ready = Engine.mergedBlob ? '可下载' : (Engine.isPlaying ? '录制中' : '未录制');
+                const ready = Engine.mergedBlob
+                    ? '可下载'
+                    : (Engine.isPlaying ? '生成中' : (Engine.scenes.length ? '待生成' : '未生成'));
                 DOM.overviewExport.innerText = `${format} · ${ready}`;
             }
         }
@@ -1997,6 +2000,13 @@
         function releaseObjectUrls() {
             Engine.objectUrls.forEach(url => URL.revokeObjectURL(url));
             Engine.objectUrls = [];
+        }
+
+        function stopStreamTracks(stream) {
+            if (!stream) return;
+            stream.getTracks().forEach((track) => {
+                try { track.stop(); } catch (e) {}
+            });
         }
 
         function clearPlaybackState() {
@@ -2643,7 +2653,7 @@
             };
         }
 
-        function requestRecorderStop(recorder, delayMs = 80) {
+        function requestRecorderStop(recorder, delayMs = 160) {
             if (!recorder || recorder.state === 'inactive') return;
             try { recorder.requestData(); } catch (e) {}
             setTimeout(() => {
@@ -3060,9 +3070,10 @@
         }
 
         function updateActionButtons() {
+            const hasSceneCards = document.querySelectorAll('.scene-card').length > 0;
             DOM.playRecordBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
             DOM.downloadBtn.disabled = !Engine.mergedBlob || Engine.isBatchExporting || Engine.isPlaying;
-            DOM.downloadScenesBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
+            DOM.downloadScenesBtn.disabled = !hasSceneCards || Engine.isBatchExporting || Engine.isPlaying;
             updateSettingsOverview();
         }
 
@@ -3073,6 +3084,101 @@
             if (lower.includes('video/webm')) return 'webm';
             if (lower.includes('video/ogg') || lower.includes('video/ogv')) return 'ogv';
             return '';
+        }
+
+        function getFileFingerprint(file) {
+            if (!file) return '';
+            return [file.name, file.size, file.lastModified, file.type].join('__');
+        }
+
+        function computeSceneBuildSignature() {
+            const cards = [...document.querySelectorAll('.scene-card')];
+            const payload = {
+                pexelsKey: pexelsInput.value.trim(),
+                videoSize: document.getElementById('videoSize')?.value || '',
+                scenes: cards.map((card) => {
+                    const id = card.dataset.sceneId;
+                    const source = document.getElementById(`source-${id}`)?.value || 'pexels';
+                    return {
+                        id,
+                        source,
+                        keyword: document.getElementById(`keyword-${id}`)?.value.trim() || '',
+                        text: document.getElementById(`text-${id}`)?.value.trim() || '',
+                        voiceId: document.getElementById(`voice-${id}`)?.value || '',
+                        duration: document.getElementById(`duration-${id}`)?.value || '0',
+                        file: getFileFingerprint(document.getElementById(`file-${id}`)?.files?.[0] || null)
+                    };
+                })
+            };
+            return JSON.stringify(payload);
+        }
+
+        function getRecorderTimeslice(mimeType) {
+            const container = getContainerFromMimeType(mimeType);
+            return container === 'mp4' ? 0 : 240;
+        }
+
+        function startRecorderCapture(recorder, mimeType) {
+            const timeslice = getRecorderTimeslice(mimeType);
+            if (timeslice > 0) {
+                recorder.start(timeslice);
+                return;
+            }
+            recorder.start();
+        }
+
+        function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
+            return new Promise((resolve, reject) => {
+                let stopSeen = false;
+                let settled = false;
+                let finalizeTimer = null;
+
+                const cleanup = () => {
+                    if (finalizeTimer) {
+                        clearTimeout(finalizeTimer);
+                        finalizeTimer = null;
+                    }
+                    recorder.ondataavailable = null;
+                    recorder.onerror = null;
+                    recorder.onstop = null;
+                };
+
+                const finalize = () => {
+                    if (!stopSeen || settled) return;
+                    if (finalizeTimer) clearTimeout(finalizeTimer);
+                    finalizeTimer = setTimeout(() => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        const blob = buildVideoBlobFromChunks(chunks, fallbackType);
+                        if (!blob) {
+                            reject(new Error(emptyMessage));
+                            return;
+                        }
+                        resolve(blob);
+                    }, 260);
+                };
+
+                recorder.ondataavailable = (e) => {
+                    if (!e.data) return;
+                    Engine.recordedChunks.push(e.data);
+                    if (e.data.size > 0) chunks.push(e.data);
+                    if (stopSeen) finalize();
+                };
+                recorder.onerror = (e) => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    try {
+                        if (recorder.state !== 'inactive') requestRecorderStop(recorder, 0);
+                    } catch (err) {}
+                    reject(e?.error instanceof Error ? e.error : new Error('录制器发生错误。'));
+                };
+                recorder.onstop = () => {
+                    stopSeen = true;
+                    finalize();
+                };
+            });
         }
 
         function triggerNamedBlobDownload(blob, filename) {
@@ -3219,119 +3325,86 @@
             return new Blob([...localParts, ...centralParts, endHeader], { type: 'application/zip' });
         }
 
-        DOM.generateBtn.onclick = async function () {
-            DOM.generateBtn.disabled = true;
-            DOM.playRecordBtn.disabled = true;
-            DOM.playRecordBtn.innerText = '第二步: 播放并录制';
-            DOM.downloadBtn.disabled = true;
-            DOM.downloadScenesBtn.disabled = true;
+        async function prepareScenesForGeneration(force = false) {
+            const nextSignature = computeSceneBuildSignature();
+            if (!force && Engine.scenes.length && Engine.sceneBuildSignature === nextSignature) {
+                log(`场景资产未变化，复用已解析结果（${Engine.scenes.length} 个场景）。`);
+                return Engine.scenes;
+            }
+
             Engine.scenes = [];
+            Engine.sceneBuildSignature = '';
             Engine.mergedBlob = null;
             Engine.currentRecorderMimeType = '';
             Engine.recordedChunks = [];
             clearPlaybackState();
             releaseObjectUrls();
             setStatus('资产解析中', 'busy');
+            log('正在并行解析场景资产...');
 
-            try {
-                log('正在并行解析场景资产...');
-                await ensureAudioContextReady();
-                await decodeSelectedBgmBuffers();
+            const drafts = collectSceneDrafts();
+            const hasPexels = drafts.some(d => d.source === 'pexels');
+            if (hasPexels) {
+                const key = pexelsInput.value.trim();
+                if (!key) throw new Error('请先填写 Pexels API Key。');
+                const [targetW, targetH] = getTargetResolution();
+                await assignPexelsVideos(drafts, key, targetW, targetH);
+            }
 
-                const drafts = collectSceneDrafts();
-                const hasPexels = drafts.some(d => d.source === 'pexels');
-                if (hasPexels) {
-                    const key = pexelsInput.value.trim();
-                    if (!key) throw new Error('请先填写 Pexels API Key。');
-                    const [targetW, targetH] = getTargetResolution();
-                    await assignPexelsVideos(drafts, key, targetW, targetH);
+            const builtScenes = await runWithLimit(drafts, 4, async (draft, idx) => {
+                log(`并行处理中 ${idx + 1}/${drafts.length}...`);
+
+                let videoUrl = draft.videoUrl || null;
+                if (draft.source === 'local') {
+                    videoUrl = URL.createObjectURL(draft.file);
+                    Engine.objectUrls.push(videoUrl);
+                }
+                if (!videoUrl) throw new Error(`场景 ${idx + 1} 未找到可用视频。`);
+
+                if (isRemoteHttpUrl(videoUrl)) {
+                    try {
+                        const cachedVideo = await fetchRemoteAssetToObjectUrl(videoUrl);
+                        videoUrl = cachedVideo.url;
+                    } catch (err) {
+                        log(`场景 ${idx + 1} 视频走直连模式（可能受跨域限制）。`);
+                    }
                 }
 
-                const builtScenes = await runWithLimit(drafts, 4, async (draft, idx) => {
-                    log(`并行处理中 ${idx + 1}/${drafts.length}...`);
+                const ttsPromise = draft.text
+                    ? fetchTTSAsset(draft.text, draft.voiceId)
+                    : Promise.resolve({ audioBuffer: null, audioUrl: null, duration: 0 });
+                const videoDurationPromise = getVideoDuration(videoUrl);
+                const [ttsAsset, videoDurationRaw] = await Promise.all([ttsPromise, videoDurationPromise]);
 
-                    let videoUrl = draft.videoUrl || null;
-                    if (draft.source === 'local') {
-                        videoUrl = URL.createObjectURL(draft.file);
-                        Engine.objectUrls.push(videoUrl);
-                    }
-                    if (!videoUrl) throw new Error(`场景 ${idx + 1} 未找到可用视频。`);
+                const estimatedSpeechDuration = draft.text ? clampNum(draft.text.length / 4.2, 1.6, 45) : 0;
+                const ttsDuration = ttsAsset.duration || estimatedSpeechDuration || 0;
+                const videoDuration = Math.max(1, videoDurationRaw || 4);
+                const autoDuration = ttsDuration || videoDuration || 4;
+                const duration = draft.hasCustomDuration ? draft.customDuration : autoDuration;
 
-                    if (isRemoteHttpUrl(videoUrl)) {
-                        try {
-                            const cachedVideo = await fetchRemoteAssetToObjectUrl(videoUrl);
-                            videoUrl = cachedVideo.url;
-                        } catch (err) {
-                            log(`场景 ${idx + 1} 视频走直连模式（可能受跨域限制）。`);
-                        }
-                    }
+                return {
+                    id: draft.id,
+                    videoUrl,
+                    text: draft.text,
+                    audioBuffer: ttsAsset.audioBuffer,
+                    ttsUrl: ttsAsset.audioUrl,
+                    videoDuration,
+                    duration: Math.max(0.5, duration || 4),
+                    hasCustomDuration: draft.hasCustomDuration
+                };
+            });
 
-                    const ttsPromise = draft.text
-                        ? fetchTTSAsset(draft.text, draft.voiceId)
-                        : Promise.resolve({ audioBuffer: null, audioUrl: null, duration: 0 });
-                    const videoDurationPromise = getVideoDuration(videoUrl);
-                    const [ttsAsset, videoDurationRaw] = await Promise.all([ttsPromise, videoDurationPromise]);
+            Engine.scenes = builtScenes;
+            Engine.sceneBuildSignature = nextSignature;
+            log(`资产解析完成，共 ${Engine.scenes.length} 个场景。`, 'success');
+            setStatus('资产就绪', 'ok');
+            return Engine.scenes;
+        }
 
-                    const estimatedSpeechDuration = draft.text ? clampNum(draft.text.length / 4.2, 1.6, 45) : 0;
-                    const ttsDuration = ttsAsset.duration || estimatedSpeechDuration || 0;
-                    const videoDuration = Math.max(1, videoDurationRaw || 4);
-                    const autoDuration = ttsDuration || videoDuration || 4;
-                    const duration = draft.hasCustomDuration ? draft.customDuration : autoDuration;
-
-                    return {
-                        id: draft.id,
-                        videoUrl,
-                        text: draft.text,
-                        audioBuffer: ttsAsset.audioBuffer,
-                        ttsUrl: ttsAsset.audioUrl,
-                        videoDuration,
-                        duration: Math.max(0.5, duration || 4),
-                        hasCustomDuration: draft.hasCustomDuration
-                    };
-                });
-
-                Engine.scenes = builtScenes;
-                log(`资产解析完成，共 ${Engine.scenes.length} 个场景。`, 'success');
-                setStatus('资产就绪', 'ok');
-            } catch (err) {
-                console.error(err);
-                Engine.scenes = [];
-                Engine.mergedBlob = null;
-                Engine.currentRecorderMimeType = '';
-                log(`解析失败: ${err.message}`, 'error');
-                setStatus('解析失败', 'error');
-                alert(err.message || '资产解析失败，请检查输入后重试。');
-            } finally {
-                DOM.generateBtn.disabled = false;
-                updateActionButtons();
-            }
-        };
-
-        DOM.playRecordBtn.onclick = async function () {
-            if (!Engine.scenes.length) {
-                alert('请先执行第一步解析场景资产。');
-                return;
-            }
+        async function recordMergedScenesToBlob() {
             if (typeof MediaRecorder === 'undefined') {
-                alert('当前浏览器不支持 MediaRecorder，无法进行录制下载。');
-                return;
+                throw new Error('当前浏览器不支持 MediaRecorder，无法进行视频生成。');
             }
-
-            await ensureAudioContextReady();
-
-            log('启动混流渲染管线...');
-            setStatus('录制中', 'busy');
-            DOM.playRecordBtn.disabled = true;
-            DOM.playRecordBtn.innerText = '录制中...';
-            DOM.downloadBtn.disabled = true;
-            DOM.downloadScenesBtn.disabled = true;
-
-            Engine.isPlaying = true;
-            Engine.currentIdx = 0;
-            Engine.recordedChunks = [];
-            Engine.mergedBlob = null;
-            Engine.currentRecorderMimeType = '';
-            const mergedChunks = [];
 
             const [w, h] = getTargetResolution();
             DOM.canvas.width = w;
@@ -3339,86 +3412,123 @@
             drawBlackFrameToCanvas();
 
             clearPlaybackState();
+            Engine.isPlaying = true;
+            Engine.currentIdx = 0;
+            Engine.recordedChunks = [];
+            Engine.mergedBlob = null;
+            Engine.currentRecorderMimeType = '';
 
             const dest = Engine.audioCtx.createMediaStreamDestination();
+            let mixStream = null;
+            let recorderSetup = null;
             try {
                 startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
-                const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-                const recorderSetup = createMediaRecorderForStream(mixStream);
+                mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                recorderSetup = createMediaRecorderForStream(mixStream);
                 Engine.mediaRecorder = recorderSetup.recorder;
                 Engine.currentRecorderMimeType = recorderSetup.mimeType || 'video/webm';
                 if (recorderSetup.fallbackUsed) {
                     log(`所选格式 ${recorderSetup.requestedLabel} 当前浏览器不可用，已自动切换为 ${recorderSetup.actualContainer.toUpperCase()}。`, 'error');
                 }
             } catch (err) {
-                console.error(err);
                 stopBgmSources();
-                Engine.isPlaying = false;
-                DOM.playRecordBtn.disabled = false;
-                DOM.playRecordBtn.innerText = '第二步: 播放并录制';
-                setStatus('录制失败', 'error');
-                log(`录制器初始化失败: ${err.message || err}`, 'error');
-                updateActionButtons();
-                return;
-            }
-
-            Engine.mediaRecorder.ondataavailable = (e) => {
-                if (!e.data) return;
-                Engine.recordedChunks.push(e.data);
-                if (e.data.size > 0) mergedChunks.push(e.data);
-            };
-            Engine.mediaRecorder.onerror = (e) => {
-                console.error('MediaRecorder 错误:', e);
-                log('录制器发生错误，正在停止录制。', 'error');
-                setStatus('录制失败', 'error');
-                if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
-                    requestRecorderStop(Engine.mediaRecorder, 0);
-                }
-            };
-
-            Engine.mediaRecorder.onstop = () => {
-                clearPlaybackState();
-                stopBgmSources();
+                stopStreamTracks(mixStream);
+                Engine.mediaRecorder = null;
                 Engine.isPlaying = false;
                 cancelAnimationFrame(Engine.animFrame);
-                DOM.player.pause();
-                DOM.player.removeAttribute('src');
-                DOM.player.load();
-                DOM.player.style.display = 'none';
-                DOM.subtitle.innerText = '';
+                Engine.animFrame = null;
+                resetPreviewPlaybackState();
+                throw new Error(`录制器初始化失败: ${err.message || err}`);
+            }
 
-                DOM.playRecordBtn.disabled = false;
-                DOM.playRecordBtn.innerText = '重新录制';
-                const fallbackType = Engine.currentRecorderMimeType || getPreferredMimeType() || 'video/webm';
-                const mergedBlob = buildVideoBlobFromChunks(mergedChunks, fallbackType);
-                if (mergedBlob) {
-                    Engine.mergedBlob = mergedBlob;
-                    log('视频录制结束，可下载合并视频或分场景视频。', 'success');
-                    setStatus('录制完成', 'ok');
-                } else {
-                    Engine.mergedBlob = null;
-                    log('录制结束但未生成可下载数据，请重试。', 'error');
-                    setStatus('录制无数据', 'error');
-                }
-                updateActionButtons();
-            };
+            const mergedChunks = [];
+            const fallbackType = recorderSetup.mimeType || getPreferredMimeType() || 'video/webm';
+            const blobPromise = collectRecorderBlob(
+                Engine.mediaRecorder,
+                mergedChunks,
+                fallbackType,
+                '录制结束但未生成可下载数据，请重试。'
+            );
 
             renderLoop();
+
             try {
-                Engine.mediaRecorder.start(180);
+                startRecorderCapture(Engine.mediaRecorder, recorderSetup.mimeType);
+            } catch (err) {
+                stopBgmSources();
+                stopStreamTracks(mixStream);
+                Engine.mediaRecorder = null;
+                Engine.isPlaying = false;
+                cancelAnimationFrame(Engine.animFrame);
+                Engine.animFrame = null;
+                resetPreviewPlaybackState();
+                throw new Error(`录制启动失败: ${err.message || err}`);
+            }
+
+            try {
+                playNextScene(dest);
+                const mergedBlob = await blobPromise;
+                Engine.mergedBlob = mergedBlob;
+                return mergedBlob;
+            } finally {
+                clearPlaybackState();
+                stopBgmSources();
+                stopStreamTracks(mixStream);
+                Engine.isPlaying = false;
+                cancelAnimationFrame(Engine.animFrame);
+                Engine.animFrame = null;
+                Engine.mediaRecorder = null;
+                resetPreviewPlaybackState();
+            }
+        }
+
+        async function generateMergedVideo(forceRefreshAssets = false) {
+            if (Engine.isPlaying || Engine.isBatchExporting) return null;
+
+            DOM.generateBtn.disabled = true;
+            DOM.playRecordBtn.disabled = true;
+            DOM.generateBtn.innerText = '生成中...';
+            DOM.playRecordBtn.innerText = '生成中...';
+            DOM.downloadBtn.disabled = true;
+            DOM.downloadScenesBtn.disabled = true;
+            Engine.mergedBlob = null;
+            updateSettingsOverview();
+
+            try {
+                await ensureAudioContextReady();
+                await Promise.all([
+                    prepareScenesForGeneration(forceRefreshAssets),
+                    decodeSelectedBgmBuffers()
+                ]);
+
+                setStatus('生成视频中', 'busy');
+                log('场景资产准备完成，开始统一生成视频...');
+                const blob = await recordMergedScenesToBlob();
+                log('视频生成完成，可下载合并视频或分场景视频。', 'success');
+                setStatus('生成完成', 'ok');
+                return blob;
             } catch (err) {
                 console.error(err);
-                stopBgmSources();
-                DOM.playRecordBtn.disabled = false;
-                DOM.playRecordBtn.innerText = '第二步: 播放并录制';
-                Engine.isPlaying = false;
-                setStatus('录制失败', 'error');
-                log(`录制启动失败: ${err.message || err}`, 'error');
+                Engine.mergedBlob = null;
+                log(`生成失败: ${err.message || err}`, 'error');
+                setStatus('生成失败', 'error');
+                alert(err.message || '视频生成失败，请检查输入后重试。');
+                return null;
+            } finally {
+                DOM.generateBtn.disabled = false;
+                DOM.generateBtn.innerText = '生成视频';
+                DOM.playRecordBtn.innerText = '重新生成';
                 updateActionButtons();
-                return;
             }
-            playNextScene(dest);
+        }
+
+        DOM.generateBtn.onclick = async function () {
+            await generateMergedVideo(false);
+        };
+
+        DOM.playRecordBtn.onclick = async function () {
+            await generateMergedVideo(false);
         };
 
         function playNextScene(dest) {
@@ -3428,7 +3538,7 @@
                 Engine.isPlaying = false;
                 setTimeout(() => {
                     if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
-                        requestRecorderStop(Engine.mediaRecorder, 120);
+                        requestRecorderStop(Engine.mediaRecorder, 220);
                     }
                 }, 180);
                 return;
@@ -3666,12 +3776,31 @@
             drawBlackFrameToCanvas();
 
             const dest = Engine.audioCtx.createMediaStreamDestination();
-            startBgmSources(dest);
-            const vStream = DOM.canvas.captureStream(30);
-            const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-            const recorderSetup = createMediaRecorderForStream(mixStream);
+            let mixStream = null;
+            let recorderSetup = null;
+            try {
+                startBgmSources(dest);
+                const vStream = DOM.canvas.captureStream(30);
+                mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                recorderSetup = createMediaRecorderForStream(mixStream);
+            } catch (err) {
+                stopBgmSources();
+                stopStreamTracks(mixStream);
+                Engine.isPlaying = false;
+                cancelAnimationFrame(Engine.animFrame);
+                Engine.animFrame = null;
+                resetPreviewPlaybackState();
+                throw new Error(`场景 ${sceneIndex + 1} 录制器初始化失败。`);
+            }
             const recorder = recorderSetup.recorder;
             const sceneChunks = [];
+            const outputType = recorderSetup.mimeType || getPreferredMimeType() || 'video/webm';
+            const blobPromise = collectRecorderBlob(
+                recorder,
+                sceneChunks,
+                outputType,
+                `场景 ${sceneIndex + 1} 未生成录制数据。`
+            );
 
             return await new Promise((resolve, reject) => {
                 let closed = false;
@@ -3689,40 +3818,12 @@
                     } catch (e) {}
                     clearPlaybackState();
                     stopBgmSources();
+                    stopStreamTracks(mixStream);
                     Engine.isPlaying = false;
                     cancelAnimationFrame(Engine.animFrame);
+                    Engine.animFrame = null;
                     resetPreviewPlaybackState();
                     reject(err);
-                };
-
-                recorder.ondataavailable = (e) => {
-                    if (!e.data) return;
-                    Engine.recordedChunks.push(e.data);
-                    if (e.data.size > 0) sceneChunks.push(e.data);
-                };
-                recorder.onerror = () => {
-                    closeWithError(new Error(`场景 ${sceneIndex + 1} 录制器异常。`));
-                };
-                recorder.onstop = () => {
-                    if (closed) return;
-                    closed = true;
-                    if (loadWatchdog) {
-                        clearTimeout(loadWatchdog);
-                        loadWatchdog = null;
-                    }
-                    clearPlaybackState();
-                    stopBgmSources();
-                    Engine.isPlaying = false;
-                    cancelAnimationFrame(Engine.animFrame);
-                    resetPreviewPlaybackState();
-
-                    const outputType = recorderSetup.mimeType || getPreferredMimeType() || 'video/webm';
-                    const blob = buildVideoBlobFromChunks(sceneChunks, outputType);
-                    if (!blob) {
-                        reject(new Error(`场景 ${sceneIndex + 1} 未生成录制数据。`));
-                        return;
-                    }
-                    resolve(blob);
                 };
 
                 DOM.player.style.display = 'block';
@@ -3790,7 +3891,7 @@
                     }
 
                     try {
-                        recorder.start(180);
+                        startRecorderCapture(recorder, recorderSetup.mimeType);
                     } catch (err) {
                         closeWithError(new Error(`场景 ${sceneIndex + 1} 录制启动失败。`));
                         return;
@@ -3800,6 +3901,24 @@
                         if (recorder.state !== 'inactive') requestRecorderStop(recorder);
                     }, (scene.duration + 0.22) * 1000);
                     renderLoop();
+                    blobPromise.then((blob) => {
+                        if (closed) return;
+                        closed = true;
+                        if (loadWatchdog) {
+                            clearTimeout(loadWatchdog);
+                            loadWatchdog = null;
+                        }
+                        clearPlaybackState();
+                        stopBgmSources();
+                        stopStreamTracks(mixStream);
+                        Engine.isPlaying = false;
+                        cancelAnimationFrame(Engine.animFrame);
+                        Engine.animFrame = null;
+                        resetPreviewPlaybackState();
+                        resolve(blob);
+                    }).catch((err) => {
+                        closeWithError(err);
+                    });
                 };
                 DOM.player.onloadeddata = startSceneRecord;
                 DOM.player.oncanplay = startSceneRecord;
@@ -3822,10 +3941,6 @@
         };
 
         DOM.downloadScenesBtn.onclick = async () => {
-            if (!Engine.scenes.length) {
-                alert('请先执行第一步解析场景资产。');
-                return;
-            }
             if (typeof MediaRecorder === 'undefined') {
                 alert('当前浏览器不支持 MediaRecorder，无法导出分场景视频。');
                 return;
@@ -3850,6 +3965,12 @@
             const exportedSceneFiles = [];
             const batchStamp = Date.now();
             try {
+                await ensureAudioContextReady();
+                await Promise.all([
+                    prepareScenesForGeneration(false),
+                    decodeSelectedBgmBuffers()
+                ]);
+
                 for (let i = 0; i < Engine.scenes.length; i++) {
                     log(`正在导出场景 ${i + 1}/${Engine.scenes.length}...`);
                     try {
