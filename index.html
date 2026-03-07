@@ -1974,8 +1974,11 @@
 
             if (DOM.overviewMusic) {
                 const allCount = Engine.bgmLibrary.length;
-                const selectedCount = DOM.bgmLibraryList ? DOM.bgmLibraryList.selectedOptions.length : 0;
-                const vol = Math.round((parseFloat(DOM.bgmVolume?.value || '0') || 0) * 100);
+                const selectedCount = DOM.bgmLibraryList
+                    ? DOM.bgmLibraryList.selectedOptions.length
+                    : Engine.bgmLibrary.filter(item => item.selected !== false).length;
+                const rawVol = parseFloat(DOM.bgmVolume?.value || '0') || 0;
+                const vol = rawVol <= 1 ? Math.round(rawVol * 100) : Math.round(rawVol);
                 DOM.overviewMusic.innerText = `${allCount} 首(${selectedCount}) · ${vol}%`;
             }
 
@@ -2232,19 +2235,23 @@ function addScene() {
             updateSettingsOverview();
         }
 
-        DOM.bgmInput.addEventListener('change', (e) => {
-            addBgmFilesToLibrary(e.target.files);
-            DOM.bgmInput.value = '';
-        });
-        pexelsInput.addEventListener('input', updateSettingsOverview);
-        DOM.removeBgmBtn.addEventListener('click', removeSelectedBgmTracks);
-        DOM.clearBgmBtn.addEventListener('click', () => {
-            Engine.bgmLibrary = [];
-            refreshBgmLibraryList();
-            updateSettingsOverview();
-        });
-        DOM.bgmLibraryList.addEventListener('change', updateSettingsOverview);
-        DOM.bgmVolume.addEventListener('input', updateSettingsOverview);
+        if (DOM.bgmInput) {
+            DOM.bgmInput.addEventListener('change', (e) => {
+                addBgmFilesToLibrary(e.target.files);
+                DOM.bgmInput.value = '';
+            });
+        }
+        if (pexelsInput) pexelsInput.addEventListener('input', updateSettingsOverview);
+        if (DOM.removeBgmBtn) DOM.removeBgmBtn.addEventListener('click', removeSelectedBgmTracks);
+        if (DOM.clearBgmBtn) {
+            DOM.clearBgmBtn.addEventListener('click', () => {
+                Engine.bgmLibrary = [];
+                refreshBgmLibraryList();
+                updateSettingsOverview();
+            });
+        }
+        if (DOM.bgmLibraryList) DOM.bgmLibraryList.addEventListener('change', updateSettingsOverview);
+        if (DOM.bgmVolume) DOM.bgmVolume.addEventListener('input', updateSettingsOverview);
 
         function syncTextInspector() {
             const disabled = !activeTextBox;
