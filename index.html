@@ -1806,6 +1806,8 @@
             animFrame: null,
             activeBgmSources: [],
             bgmDestination: null,
+            previewMode: 'editor',
+            mergedPreviewUrl: '',
             sceneTimer: null,
             objectUrls: [],
             subtitleStyleKey: 'classic',
@@ -3363,8 +3365,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             DOM.canvas.height = h;
             drawBlackFrameToCanvas();
 
-            clearPlaybackState();
-            stopBgmSources();
+            resetPreviewPlaybackState();
             Engine.isPlaying = true;
             Engine.currentIdx = 0;
             Engine.recordedChunks = [];
@@ -3471,6 +3472,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                 setStatus('生成视频中', 'busy');
                 log('场景资产准备完成，开始统一生成视频...');
                 const blob = await recordMergedScenesToBlob();
+                if (blob) showMergedVideoPreview(blob);
                 log('视频生成完成，可下载合并视频或分场景视频。', 'success');
                 setStatus('生成完成', 'ok');
                 return blob;
@@ -3674,23 +3676,13 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             Engine.animFrame = requestAnimationFrame(renderLoop);
         }
 
-        function resetPreviewPlaybackState() {
-            DOM.player.pause();
-            DOM.player.loop = false;
-            DOM.player.removeAttribute('src');
-            DOM.player.load();
-            DOM.player.style.display = 'none';
-            DOM.subtitle.innerText = '';
-        }
-
         async function recordSingleSceneBlob(scene, sceneIndex, totalScenes) {
             if (typeof MediaRecorder === 'undefined') {
                 throw new Error('当前浏览器不支持 MediaRecorder。');
             }
             await ensureAudioContextReady();
 
-            clearPlaybackState();
-            stopBgmSources();
+            resetPreviewPlaybackState();
             Engine.recordedChunks = [];
             Engine.isPlaying = true;
 
@@ -3949,20 +3941,69 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
         // ======================= 新增逻辑替换区 =======================
 
         // 【1】字幕预览测试支持
-        function updateMainSubtitlePreview() {
-            const previewEl = document.getElementById('previewSubtitleText');
-            if (previewEl && !Engine.isPlaying) {
-                DOM.subtitle.innerText = previewEl.value;
-                applySubtitlePreviewStyle();
-            }
+        function releaseMergedPreviewUrl() {
+            if (!Engine.mergedPreviewUrl) return;
+            try { URL.revokeObjectURL(Engine.mergedPreviewUrl); } catch (e) {}
+            Engine.mergedPreviewUrl = '';
         }
-        function resetPreviewPlaybackState() {
+
+        function switchToEditorPreview(clearVideo = true) {
+            Engine.previewMode = 'editor';
+            DOM.player.controls = false;
+            DOM.player.removeAttribute('controls');
+            DOM.player.muted = true;
+            DOM.player.setAttribute('muted', '');
+            DOM.subtitle.style.display = '';
+            DOM.textLayer.style.display = '';
+            if (!clearVideo) return;
             DOM.player.pause();
             DOM.player.loop = false;
             DOM.player.removeAttribute('src');
             DOM.player.load();
             DOM.player.style.display = 'none';
-            // 恢复预览字幕
+        }
+
+        function showMergedVideoPreview(blob) {
+            if (!(blob instanceof Blob) || blob.size <= 0) return;
+            clearPlaybackState();
+            stopBgmSources();
+            releaseMergedPreviewUrl();
+
+            Engine.previewMode = 'merged';
+            DOM.subtitle.style.display = 'none';
+            DOM.textLayer.style.display = 'none';
+            DOM.player.controls = true;
+            DOM.player.setAttribute('controls', 'controls');
+            DOM.player.muted = false;
+            DOM.player.removeAttribute('muted');
+            DOM.player.loop = false;
+            DOM.player.style.display = 'block';
+
+            const previewUrl = URL.createObjectURL(blob);
+            Engine.mergedPreviewUrl = previewUrl;
+            DOM.player.src = previewUrl;
+            DOM.player.load();
+            const p = DOM.player.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(() => {
+                    log('已加载成片预览，点击监视器中的播放按钮即可查看。');
+                });
+            }
+        }
+
+        function updateMainSubtitlePreview() {
+            const previewEl = document.getElementById('previewSubtitleText');
+            if (previewEl && !Engine.isPlaying && Engine.previewMode !== 'merged') {
+                DOM.subtitle.innerText = previewEl.value;
+                applySubtitlePreviewStyle();
+            }
+        }
+
+        function resetPreviewPlaybackState() {
+            clearPlaybackState();
+            stopBgmSources();
+            releaseMergedPreviewUrl();
+            switchToEditorPreview(true);
             updateMainSubtitlePreview();
         }
 
@@ -4104,6 +4145,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
         
         // 初始化时设置默认测试字幕
         setTimeout(() => updateMainSubtitlePreview(), 100);
+        window.addEventListener('beforeunload', () => releaseMergedPreviewUrl());
 
 
         // ======================= 主字幕高级交互与预览引擎 =======================
@@ -4123,7 +4165,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
         // 3. 监听文本框输入，实现实时预览
         document.getElementById('scenesContainer').addEventListener('input', (e) => {
             if (e.target.tagName.toLowerCase() === 'textarea' && e.target.id.startsWith('text-')) {
-                if (!Engine.isPlaying) {
+                if (!Engine.isPlaying && Engine.previewMode !== 'merged') {
                     DOM.subtitle.innerText = e.target.value;
                     applySubtitlePreviewStyle();
                 }
@@ -4131,7 +4173,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
         });
         document.getElementById('scenesContainer').addEventListener('focusin', (e) => {
             if (e.target.tagName.toLowerCase() === 'textarea' && e.target.id.startsWith('text-')) {
-                if (!Engine.isPlaying) {
+                if (!Engine.isPlaying && Engine.previewMode !== 'merged') {
                     DOM.subtitle.innerText = e.target.value;
                     applySubtitlePreviewStyle();
                 }
