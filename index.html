@@ -738,6 +738,28 @@
             gap: 10px;
         }
 
+        .scene-preset-list {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            margin-top: 4px;
+        }
+
+        .scene-preset-item {
+            display: grid;
+            grid-template-columns: minmax(130px, 1fr) minmax(0, 1.6fr) auto;
+            gap: 7px;
+            align-items: center;
+        }
+
+        .scene-preset-item input {
+            min-width: 0;
+        }
+
+        .scene-preset-remove {
+            padding: 6px 10px;
+        }
+
         .duration-input-wrap {
             display: flex;
             align-items: center;
@@ -911,6 +933,22 @@
             position: absolute;
             inset: 0;
             z-index: 20;
+        }
+
+        #scenePresetLayer {
+            position: absolute;
+            inset: 0;
+            z-index: 16;
+            pointer-events: none;
+        }
+
+        .scene-preset-text {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
         }
 
         #mainSubtitle {
@@ -1291,6 +1329,7 @@
             }
 
             .scene-meta-grid,
+            .scene-preset-item,
             .row,
             .action-row {
                 grid-template-columns: 1fr;
@@ -1674,6 +1713,7 @@
                             <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
                                 <video id="mediaPlayer" class="preview-media" crossorigin="anonymous" muted playsinline></video>
                                 <div id="mainSubtitle"></div>
+                                <div id="scenePresetLayer"></div>
                                 <div id="textLayer"></div>
                             </div>
                         </div>
@@ -1804,6 +1844,7 @@
             scenes: [],
             sceneBuildSignature: '',
             textBoxes: [],
+            activeScenePresetTexts: [],
             textBoxPresets: [],
             audioCtx: null,
             bgmLibrary: [],
@@ -1837,6 +1878,7 @@
             subtitle: document.getElementById('mainSubtitle'),
             preview: document.getElementById('previewBox'),
             workspace: document.querySelector('.workspace'),
+            scenePresetLayer: document.getElementById('scenePresetLayer'),
             textLayer: document.getElementById('textLayer'),
             sceneCounter: document.getElementById('sceneCounter'),
             statusPill: document.querySelector('.status-pill'),
@@ -2164,10 +2206,17 @@ function addScene() {
                         <label>场景字幕</label>
                         <textarea id="text-${id}" rows="2" placeholder="在此输入解说词..."></textarea>
                     </div>
+
+                    <div class="ctrl-group">
+                        <label>场景预设文本</label>
+                        <div id="scenePresetTextList-${id}" class="scene-preset-list"></div>
+                        <button type="button" class="chip-btn" onclick="addScenePresetText(${id})">+ 添加预设文本</button>
+                    </div>
                 </div>
             `;
             document.getElementById('scenesContainer').insertAdjacentHTML('beforeend', html);
             refreshSceneBgmSelectors();
+            refreshScenePresetTextSelectors();
             updateSceneCounter();
         }
 
@@ -2188,6 +2237,96 @@ function addScene() {
                 const stillExists = prevValue && Engine.bgmLibrary.some(item => item.id === prevValue);
                 select.value = stillExists ? prevValue : '';
             });
+        }
+
+        function fillSceneTextPresetSelectOptions(select, preferredId = '') {
+            if (!select) return;
+            const keepValue = preferredId || select.value || '';
+            select.innerHTML = '<option value="">选择文本预设</option>';
+            Engine.textBoxPresets.forEach((preset, idx) => {
+                const option = document.createElement('option');
+                option.value = preset.id;
+                option.text = `${idx + 1}. ${preset.name}`;
+                select.appendChild(option);
+            });
+            const exists = keepValue && Engine.textBoxPresets.some(item => item.id === keepValue);
+            select.value = exists ? keepValue : '';
+        }
+
+        function refreshScenePresetTextSelectors() {
+            const rows = [...document.querySelectorAll('.scene-preset-item')];
+            rows.forEach((row) => {
+                const select = row.querySelector('.scene-preset-select');
+                const input = row.querySelector('.scene-preset-input');
+                if (!select) return;
+                const prev = select.value || '';
+                fillSceneTextPresetSelectOptions(select, prev);
+                if (prev && !select.value && input) input.value = '';
+            });
+        }
+
+        function addScenePresetText(sceneId, initial = null) {
+            const container = document.getElementById(`scenePresetTextList-${sceneId}`);
+            if (!container) return;
+            const row = document.createElement('div');
+            row.className = 'scene-preset-item';
+
+            const select = document.createElement('select');
+            select.className = 'scene-preset-select';
+            fillSceneTextPresetSelectOptions(select, initial && initial.presetId ? initial.presetId : '');
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'scene-preset-input';
+            input.placeholder = '可单独编辑本场景文本';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'chip-btn scene-preset-remove';
+            removeBtn.innerText = '删';
+
+            const applySelectedPresetText = () => {
+                const preset = Engine.textBoxPresets.find(item => item.id === select.value);
+                input.value = preset ? preset.text : '';
+            };
+
+            if (initial && typeof initial.text === 'string' && initial.text.length) {
+                input.value = initial.text;
+            } else if (select.value) {
+                applySelectedPresetText();
+            }
+
+            select.addEventListener('change', () => {
+                applySelectedPresetText();
+                updateSettingsOverview();
+            });
+            input.addEventListener('input', updateSettingsOverview);
+            removeBtn.addEventListener('click', () => {
+                row.remove();
+                updateSettingsOverview();
+            });
+
+            row.appendChild(select);
+            row.appendChild(input);
+            row.appendChild(removeBtn);
+            container.appendChild(row);
+            updateSettingsOverview();
+        }
+
+        function collectScenePresetTexts(sceneId) {
+            const container = document.getElementById(`scenePresetTextList-${sceneId}`);
+            if (!container) return [];
+            return [...container.querySelectorAll('.scene-preset-item')]
+                .map((row) => {
+                    const presetId = row.querySelector('.scene-preset-select')?.value || '';
+                    if (!presetId) return null;
+                    const text = row.querySelector('.scene-preset-input')?.value || '';
+                    return {
+                        presetId,
+                        text: String(text).trim().slice(0, 120)
+                    };
+                })
+                .filter(Boolean);
         }
 
         function setAutoDuration(id) {
@@ -2444,6 +2583,8 @@ function addScene() {
             const matched = previous && Engine.textBoxPresets.some(item => item.id === previous);
             DOM.textCustomPresetSelect.value = matched ? previous : '';
             refreshTextPresetActionButtons();
+            refreshScenePresetTextSelectors();
+            updateSettingsOverview();
         }
 
         function loadTextBoxPresetsFromStorage() {
@@ -2555,6 +2696,37 @@ function addScene() {
 
         function repositionTextBoxes() {
             Engine.textBoxes.forEach(txt => applyTextPositionFromPct(txt));
+        }
+
+        function clearScenePresetPreviewTexts() {
+            Engine.activeScenePresetTexts = [];
+            if (DOM.scenePresetLayer) DOM.scenePresetLayer.innerHTML = '';
+        }
+
+        function renderScenePresetPreviewTexts(scene) {
+            clearScenePresetPreviewTexts();
+            const list = Array.isArray(scene && scene.scenePresetTexts) ? scene.scenePresetTexts : [];
+            if (!list.length || !DOM.scenePresetLayer) return;
+            Engine.activeScenePresetTexts = list.map((item) => ({
+                text: String(item.text || '').trim().slice(0, 120),
+                color: normalizeHexColor(item.color) || '#ffffff',
+                size: clampNum(Number(item.size), 12, 300),
+                x_pct: clampNum(Number(item.x_pct), 0, 1),
+                y_pct: clampNum(Number(item.y_pct), 0, 1)
+            })).filter(item => item.text);
+
+            const textFont = document.getElementById('fontFamily').value;
+            Engine.activeScenePresetTexts.forEach((item) => {
+                const el = document.createElement('div');
+                el.className = 'scene-preset-text';
+                el.innerText = item.text;
+                el.style.left = `${(item.x_pct * 100).toFixed(3)}%`;
+                el.style.top = `${(item.y_pct * 100).toFixed(3)}%`;
+                el.style.color = item.color;
+                el.style.fontSize = `${Math.round(item.size)}px`;
+                el.style.fontFamily = textFont;
+                DOM.scenePresetLayer.appendChild(el);
+            });
         }
 
         function addTextBox(preset = null) {
@@ -3104,19 +3276,39 @@ function requestRecorderStop(recorder, delayMs = 150) {
                 const source = document.getElementById(`source-${id}`).value;
                 const text = document.getElementById(`text-${id}`).value.trim();
                 const sceneBgmId = document.getElementById(`sceneBgm-${id}`)?.value || '';
+                const scenePresetTexts = collectScenePresetTexts(id);
                 const customDuration = readCustomSceneDuration(id);
                 const hasCustomDuration = customDuration > 0;
 
                 if (source === 'pexels') {
                     const keyword = document.getElementById(`keyword-${id}`).value.trim();
                     if (!keyword) throw new Error(`场景 ${idx + 1} 请选择关键词。`);
-                    return { idx, id, source, keyword, text, sceneBgmId, customDuration, hasCustomDuration };
+                    return { idx, id, source, keyword, text, sceneBgmId, scenePresetTexts, customDuration, hasCustomDuration };
                 }
 
                 const file = document.getElementById(`file-${id}`).files[0];
                 if (!file) throw new Error(`请为场景 ${idx + 1} 上传本地视频。`);
-                return { idx, id, source, file, text, sceneBgmId, customDuration, hasCustomDuration };
+                return { idx, id, source, file, text, sceneBgmId, scenePresetTexts, customDuration, hasCustomDuration };
             });
+        }
+
+        function resolveScenePresetTexts(rawList) {
+            if (!Array.isArray(rawList) || !rawList.length) return [];
+            return rawList.map((item) => {
+                const presetId = item && item.presetId ? String(item.presetId) : '';
+                if (!presetId) return null;
+                const preset = Engine.textBoxPresets.find((p) => p.id === presetId);
+                if (!preset) return null;
+                const text = String(item.text || '').trim().slice(0, 120) || preset.text;
+                return {
+                    presetId,
+                    text,
+                    color: preset.color,
+                    size: preset.size,
+                    x_pct: preset.x_pct,
+                    y_pct: preset.y_pct
+                };
+            }).filter(Boolean);
         }
 
         async function assignPexelsVideos(drafts, apiKey, targetW, targetH) {
@@ -3271,6 +3463,7 @@ function requestRecorderStop(recorder, delayMs = 150) {
                         keyword: document.getElementById(`keyword-${id}`)?.value.trim() || '',
                         text: document.getElementById(`text-${id}`)?.value.trim() || '',
                         sceneBgmId: document.getElementById(`sceneBgm-${id}`)?.value || '',
+                        scenePresetTexts: collectScenePresetTexts(id),
                         duration: document.getElementById(`duration-${id}`)?.value || '0',
                         file: getFileFingerprint(document.getElementById(`file-${id}`)?.files?.[0] || null)
                     };
@@ -3509,6 +3702,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                     videoUrl,
                     text: draft.text,
                     sceneBgmId: draft.sceneBgmId || '',
+                    scenePresetTexts: resolveScenePresetTexts(draft.scenePresetTexts),
                     videoDuration,
                     duration: Math.max(0.5, duration || 4),
                     hasCustomDuration: draft.hasCustomDuration
@@ -3683,6 +3877,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             const scene = Engine.scenes[Engine.currentIdx];
             log(`正在渲染场景 ${Engine.currentIdx + 1}/${Engine.scenes.length}...`);
             if (Engine.bgmDestination) stopBgmSources();
+            renderScenePresetPreviewTexts(scene);
 
             DOM.player.style.display = 'block';
             DOM.player.loop = scene.duration > (scene.videoDuration || 0) + 0.05;
@@ -3828,6 +4023,18 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             const textScale = h / previewH;
             const textFont = document.getElementById('fontFamily').value;
 
+            Engine.activeScenePresetTexts.forEach((txt) => {
+                const renderSize = Math.max(12, (Number(txt.size) || 24) * textScale);
+                ctx.font = `700 ${renderSize}px ${textFont}`;
+                ctx.fillStyle = txt.color || '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,0.85)';
+                ctx.shadowBlur = 6;
+                ctx.fillText(txt.text, (Number(txt.x_pct) || 0) * w, (Number(txt.y_pct) || 0) * h);
+                ctx.shadowBlur = 0;
+            });
+
             Engine.textBoxes.forEach((txt) => {
                 const renderSize = Math.max(12, txt.size * textScale);
                 ctx.font = `700 ${renderSize}px ${textFont}`;
@@ -3924,6 +4131,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                 DOM.player.load();
                 DOM.subtitle.innerText = scene.text || '';
                 applySubtitlePreviewStyle();
+                renderScenePresetPreviewTexts(scene);
                 loadWatchdog = setTimeout(() => {
                     closeWithError(new Error(`场景 ${sceneIndex + 1}/${totalScenes} 视频加载超时。`));
                 }, 12000);
@@ -4122,6 +4330,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             DOM.player.muted = true;
             DOM.player.setAttribute('muted', '');
             DOM.subtitle.style.display = '';
+            if (DOM.scenePresetLayer) DOM.scenePresetLayer.style.display = '';
             DOM.textLayer.style.display = '';
             if (!clearVideo) return;
             DOM.player.pause();
@@ -4139,6 +4348,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
 
             Engine.previewMode = 'merged';
             DOM.subtitle.style.display = 'none';
+            if (DOM.scenePresetLayer) DOM.scenePresetLayer.style.display = 'none';
             DOM.textLayer.style.display = 'none';
             DOM.player.controls = true;
             DOM.player.setAttribute('controls', 'controls');
@@ -4171,6 +4381,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             clearPlaybackState();
             stopBgmSources();
             releaseMergedPreviewUrl();
+            clearScenePresetPreviewTexts();
             switchToEditorPreview(true);
             updateMainSubtitlePreview();
         }
