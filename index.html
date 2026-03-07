@@ -734,7 +734,7 @@
 
 .scene-meta-grid {
             display: grid;
-            grid-template-columns: 1.25fr 1fr 1fr; /* 改为3列：来源稍宽，时长和配音等宽 */
+            grid-template-columns: 1.4fr 1fr;
             gap: 10px;
         }
 
@@ -1320,10 +1320,8 @@
             <span id="sceneCounter" class="scene-count-pill">场景: 1</span>
             <span class="status-pill">状态: 待命</span>
 
-            <!-- 【新增】1. 状态日志移至此处 -->
             <span id="statusLog" style="font-size: 12px; font-weight: bold; color: var(--success);">等待操作...</span>
             
-            <!-- 【新增】2. 原先的步骤按钮移至此处，并改用小型紧凑的样式 -->
             <button id="generateBtn" class="mini-download" style="background: linear-gradient(135deg, #11a47f, #2bd7a7);">生成视频</button>
             <button id="playRecordBtn" class="mini-download secondary" disabled>重新生成</button>
 
@@ -1457,7 +1455,6 @@
                     <div class="module-pane-head">
                         <div class="module-pane-title">
                             <span>Scenes · 场景编排</span>
-                            <!-- 将原来的 sceneDurationSummary 替换为 timelineTotal -->
                             <span id="timelineTotal">总时长: 00:00</span>
                         </div>
                         <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
@@ -1465,7 +1462,7 @@
                     
                     <!-- 提上来的精简版时间轴轨 -->
                     <div id="timelineTrack" class="timeline-track" style="margin-top: -4px; margin-bottom: 2px;"></div>
-                    <div class="panel-hint">每个场景支持自动取素材或本地上传。填入秒数可强制时长；设为 0 则自动按配音估算。</div>
+                    <div class="panel-hint">每个场景支持自动取素材或本地上传。填入秒数可强制时长；设为 0 则按字幕长度自动估算。</div>
                     
                     <div id="scenesContainer"></div>
                     <!-- 底部的 timeline-overview 整个区块已被安全移除 -->
@@ -1708,9 +1705,6 @@
             mergedBlob: null,
             currentRecorderMimeType: '',
             animFrame: null,
-            activeVoice: null,
-            activeVoiceEl: null,
-            activeVoiceNode: null,
             activeBgmSources: [],
             sceneTimer: null,
             objectUrls: [],
@@ -1910,12 +1904,15 @@
             return clampNum(raw, 0.5, 600);
         }
 
+        function estimateDurationByText(text) {
+            const safe = String(text || '').trim();
+            if (!safe) return 0;
+            return clampNum(safe.length / 4, 2, 32);
+        }
+
         function estimateAutoSceneDuration(id) {
             const text = (document.getElementById(`text-${id}`)?.value || '').trim();
-            if (text) {
-                return clampNum(text.length / 4, 2, 24);
-            }
-            return 4;
+            return estimateDurationByText(text) || 4;
         }
 
         function getSceneTimelineMeta(card) {
@@ -1927,7 +1924,6 @@
         }
 
 function renderTimelinePreview() {
-            // 移除了 sceneDurationSummary 的校验
             if (!DOM.timelineTrack || !DOM.timelineTotal) return;
 
             const cards = [...document.querySelectorAll('.scene-card')];
@@ -1988,21 +1984,6 @@ function renderTimelinePreview() {
             DOM.player.onloadeddata = null;
             DOM.player.onended = null;
             DOM.player.onerror = null;
-            if (Engine.activeVoice) {
-                try { Engine.activeVoice.stop(); } catch (e) {}
-                Engine.activeVoice.disconnect();
-                Engine.activeVoice = null;
-            }
-            if (Engine.activeVoiceEl) {
-                Engine.activeVoiceEl.onended = null;
-                Engine.activeVoiceEl.onerror = null;
-                try { Engine.activeVoiceEl.pause(); } catch (e) {}
-                Engine.activeVoiceEl = null;
-            }
-            if (Engine.activeVoiceNode) {
-                try { Engine.activeVoiceNode.disconnect(); } catch (e) {}
-                Engine.activeVoiceNode = null;
-            }
         }
 
 function addScene() {
@@ -2015,7 +1996,6 @@ function addScene() {
                         <button class="scene-remove" onclick="removeScene(${id})">删除</button>
                     </div>
 
-                    <!-- 【修改位置】现在这个 Grid 包含了 来源、时长、配音 三个区块 -->
                     <div class="scene-meta-grid">
                         <div class="ctrl-group">
                             <label>素材来源</label>
@@ -2033,17 +2013,6 @@ function addScene() {
                             </div>
                             <span class="duration-hint">0 = 自动估算</span>
                         </div>
-
-                        <!-- 移入此处的配音角色 -->
-                        <div class="ctrl-group">
-                            <label>配音角色</label>
-                            <select id="voice-${id}">
-                                <option value="1">标准男声</option>
-                                <option value="0">标准女声</option>
-                                <option value="3">情感男声(度逍遥)</option>
-                                <option value="4">童音(度丫丫)</option>
-                            </select>
-                        </div>
                     </div>
 
                     <div id="input-pexels-${id}" class="ctrl-group">
@@ -2057,7 +2026,7 @@ function addScene() {
                     </div>
 
                     <div class="ctrl-group">
-                        <label>旁白字幕 (将生成配音)</label>
+                        <label>场景字幕</label>
                         <textarea id="text-${id}" rows="2" placeholder="在此输入解说词..."></textarea>
                     </div>
                 </div>
@@ -2682,11 +2651,9 @@ function requestRecorderStop(recorder, delayMs = 150) {
             if (total <= 0.6) return 0;
 
             const segment = Math.max(0.5, Number(intendedDuration) || total);
+            if (segment >= total - 0.12) return 0;
             const keepTail = 0.18;
-            const roomForWholeSegment = total - Math.min(total, segment + keepTail);
-            const maxOffset = roomForWholeSegment > 0.06
-                ? roomForWholeSegment
-                : Math.max(0, total - 0.4);
+            const maxOffset = Math.max(0, total - segment - keepTail);
             if (maxOffset <= 0.06) return 0;
             return Math.random() * maxOffset;
         }
@@ -2736,109 +2703,6 @@ function requestRecorderStop(recorder, delayMs = 150) {
             const localUrl = URL.createObjectURL(blob);
             Engine.objectUrls.push(localUrl);
             return { url: localUrl, fromRemote: true, blob };
-        }
-
-        async function tryDecodeAudioArrayBuffer(arr) {
-            try {
-                return await Engine.audioCtx.decodeAudioData(arr.slice(0));
-            } catch (err) {
-                return null;
-            }
-        }
-
-        async function fetchAudioAssetFromUrl(url) {
-            const res = await fetch(url, { cache: 'no-store' });
-            if (!res.ok) throw new Error(`音频请求失败(${res.status})`);
-            const arr = await res.arrayBuffer();
-            const decoded = await tryDecodeAudioArrayBuffer(arr);
-            const mimeType = res.headers.get('content-type') || 'audio/mpeg';
-            const blob = new Blob([arr], { type: mimeType.includes('audio') ? mimeType : 'audio/mpeg' });
-            const blobUrl = URL.createObjectURL(blob);
-            Engine.objectUrls.push(blobUrl);
-
-            let duration = decoded ? (decoded.duration || 0) : 0;
-            if (!duration) {
-                duration = await getAudioDuration(blobUrl);
-            }
-            return {
-                audioBuffer: decoded,
-                audioUrl: blobUrl,
-                duration: duration || 0
-            };
-        }
-
-        async function getAudioDuration(url) {
-            return new Promise((resolve) => {
-                const probe = document.createElement('audio');
-                let done = false;
-                const finalize = (val) => {
-                    if (done) return;
-                    done = true;
-                    probe.removeAttribute('src');
-                    probe.load();
-                    resolve(val);
-                };
-
-                probe.preload = 'metadata';
-                probe.onloadedmetadata = () => {
-                    const duration = Number.isFinite(probe.duration) && probe.duration > 0 ? probe.duration : 0;
-                    finalize(duration);
-                };
-                probe.onerror = () => finalize(0);
-                probe.src = url;
-                probe.load();
-                setTimeout(() => finalize(0), 7000);
-            });
-        }
-
-function buildTtsCandidateUrls(text, voiceId) {
-            // 解析映射 voiceId: 1(男), 0(女), 3(情感男), 4(童音)
-            const baiduPer = voiceId === '1' ? 1 : voiceId === '0' ? 0 : voiceId === '3' ? 3 : 4;
-            const baiduUrl = `https://tts.baidu.com/text2audio?tex=${encodeURIComponent(text)}&cuid=web&lan=ZH&ctp=1&pdt=301&vol=9&rate=32&per=${baiduPer}`;
-
-            // StreamElements 接口自带 CORS 跨域支持，成功率 99% 
-            // （注：目前国外接口中文最稳定的是 'Zhiyu' 声线）
-            const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Zhiyu&text=${encodeURIComponent(text)}`;
-
-            // 有道 TTS 作为备用通道
-            const youdaoUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&le=zh`;
-
-            // 优先直接使用自带跨域的 StreamElements，如果失败再走代理请求百度/有道
-            return [
-                seUrl, 
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(baiduUrl)}`,
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(youdaoUrl)}`
-            ];
-        }
-
-        async function fetchTTSAsset(text, voiceId) {
-            const candidates = buildTtsCandidateUrls(text, voiceId);
-
-            for (const candidate of candidates) {
-                try {
-                    const asset = await fetchAudioAssetFromUrl(candidate);
-                    if (asset.audioBuffer || asset.duration > 0) return asset;
-                } catch (err) {
-                    console.warn('TTS 解码失败:', candidate);
-                }
-            }
-
-            for (const candidate of candidates) {
-                const duration = await getAudioDuration(candidate);
-                if (duration > 0) {
-                    return {
-                        audioBuffer: null,
-                        audioUrl: candidate,
-                        duration
-                    };
-                }
-            }
-
-            return {
-                audioBuffer: null,
-                audioUrl: null,
-                duration: 0
-            };
         }
 
         function getTargetResolution() {
@@ -2927,19 +2791,18 @@ function buildTtsCandidateUrls(text, voiceId) {
                 const id = card.dataset.sceneId;
                 const source = document.getElementById(`source-${id}`).value;
                 const text = document.getElementById(`text-${id}`).value.trim();
-                const voiceId = document.getElementById(`voice-${id}`).value;
                 const customDuration = readCustomSceneDuration(id);
                 const hasCustomDuration = customDuration > 0;
 
                 if (source === 'pexels') {
                     const keyword = document.getElementById(`keyword-${id}`).value.trim();
                     if (!keyword) throw new Error(`场景 ${idx + 1} 请选择关键词。`);
-                    return { idx, id, source, keyword, text, voiceId, customDuration, hasCustomDuration };
+                    return { idx, id, source, keyword, text, customDuration, hasCustomDuration };
                 }
 
                 const file = document.getElementById(`file-${id}`).files[0];
                 if (!file) throw new Error(`请为场景 ${idx + 1} 上传本地视频。`);
-                return { idx, id, source, file, text, voiceId, customDuration, hasCustomDuration };
+                return { idx, id, source, file, text, customDuration, hasCustomDuration };
             });
         }
 
@@ -3080,7 +2943,6 @@ function buildTtsCandidateUrls(text, voiceId) {
                         source,
                         keyword: document.getElementById(`keyword-${id}`)?.value.trim() || '',
                         text: document.getElementById(`text-${id}`)?.value.trim() || '',
-                        voiceId: document.getElementById(`voice-${id}`)?.value || '',
                         duration: document.getElementById(`duration-${id}`)?.value || '0',
                         file: getFileFingerprint(document.getElementById(`file-${id}`)?.files?.[0] || null)
                     };
@@ -3089,13 +2951,7 @@ function buildTtsCandidateUrls(text, voiceId) {
             return JSON.stringify(payload);
         }
 
-        function getRecorderTimeslice(mimeType) {
-            const container = getContainerFromMimeType(mimeType);
-            return container === 'mp4' ? 0 : 240;
-        }
-
-function startRecorderCapture(recorder, mimeType) {
-            // 移除 Timeslice 切片逻辑，直接整体录制，防止短视频分片丢失
+function startRecorderCapture(recorder) {
             recorder.start();
         }
 
@@ -3316,24 +3172,16 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                     }
                 }
 
-                const ttsPromise = draft.text
-                    ? fetchTTSAsset(draft.text, draft.voiceId)
-                    : Promise.resolve({ audioBuffer: null, audioUrl: null, duration: 0 });
-                const videoDurationPromise = getVideoDuration(videoUrl);
-                const [ttsAsset, videoDurationRaw] = await Promise.all([ttsPromise, videoDurationPromise]);
-
-                const estimatedSpeechDuration = draft.text ? clampNum(draft.text.length / 4.2, 1.6, 45) : 0;
-                const ttsDuration = ttsAsset.duration || estimatedSpeechDuration || 0;
+                const videoDurationRaw = await getVideoDuration(videoUrl);
+                const estimatedSubtitleDuration = estimateDurationByText(draft.text);
                 const videoDuration = Math.max(1, videoDurationRaw || 4);
-                const autoDuration = ttsDuration || videoDuration || 4;
+                const autoDuration = estimatedSubtitleDuration || videoDuration || 4;
                 const duration = draft.hasCustomDuration ? draft.customDuration : autoDuration;
 
                 return {
                     id: draft.id,
                     videoUrl,
                     text: draft.text,
-                    audioBuffer: ttsAsset.audioBuffer,
-                    ttsUrl: ttsAsset.audioUrl,
                     videoDuration,
                     duration: Math.max(0.5, duration || 4),
                     hasCustomDuration: draft.hasCustomDuration
@@ -3400,7 +3248,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             renderLoop();
 
             try {
-                startRecorderCapture(Engine.mediaRecorder, recorderSetup.mimeType);
+                startRecorderCapture(Engine.mediaRecorder);
             } catch (err) {
                 stopBgmSources();
                 stopStreamTracks(mixStream);
@@ -3413,7 +3261,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             }
 
             try {
-                playNextScene(dest);
+                playNextScene();
                 const mergedBlob = await blobPromise;
                 Engine.mergedBlob = mergedBlob;
                 return mergedBlob;
@@ -3477,7 +3325,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             await generateMergedVideo(false);
         };
 
-        function playNextScene(dest) {
+        function playNextScene() {
             if (!Engine.isPlaying) return;
 
             if (Engine.currentIdx >= Engine.scenes.length) {
@@ -3507,7 +3355,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                 if (advanced) return;
                 advanced = true;
                 Engine.currentIdx += 1;
-                playNextScene(dest);
+                playNextScene();
             };
             const loadWatchdog = setTimeout(() => {
                 log(`场景 ${Engine.currentIdx + 1} 加载超时，自动跳过。`, 'error');
@@ -3516,7 +3364,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
 
             DOM.player.onended = () => {
                 clearTimeout(loadWatchdog);
-                if (!scene.audioBuffer && !scene.ttsUrl && !scene.hasCustomDuration) advance();
+                if (!scene.hasCustomDuration) advance();
             };
             DOM.player.onerror = () => {
                 clearTimeout(loadWatchdog);
@@ -3538,58 +3386,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                     } catch (err) {}
                 }
                 try { await DOM.player.play(); } catch (e) {}
-
-                if (scene.audioBuffer) {
-                    const voice = Engine.audioCtx.createBufferSource();
-                    voice.buffer = scene.audioBuffer;
-                    voice.connect(dest);
-                    voice.connect(Engine.audioCtx.destination);
-                    Engine.activeVoice = voice;
-
-                    voice.onended = () => {
-                        if (!scene.hasCustomDuration) advance();
-                    };
-                    Engine.sceneTimer = setTimeout(advance, (scene.duration + 0.15) * 1000);
-                    try {
-                        voice.start(0);
-                    } catch (err) {
-                        log(`场景 ${Engine.currentIdx + 1} 配音播放失败。`, 'error');
-                        if (!scene.hasCustomDuration) advance();
-                    }
-                } else if (scene.ttsUrl) {
-                    const voiceEl = new Audio(scene.ttsUrl);
-                    voiceEl.preload = 'auto';
-                    voiceEl.playsInline = true;
-
-                    try {
-                        const voiceNode = Engine.audioCtx.createMediaElementSource(voiceEl);
-                        voiceNode.connect(dest);
-                        voiceNode.connect(Engine.audioCtx.destination);
-                        Engine.activeVoiceNode = voiceNode;
-                    } catch (err) {
-                        console.warn('TTS 媒体节点创建失败，将直接播放音频。', err);
-                    }
-
-                    Engine.activeVoiceEl = voiceEl;
-                    voiceEl.onended = () => {
-                        if (!scene.hasCustomDuration) advance();
-                    };
-                    voiceEl.onerror = () => {
-                        log(`场景 ${Engine.currentIdx + 1} 配音播放失败。`, 'error');
-                        if (!scene.hasCustomDuration) advance();
-                    };
-
-                    Engine.sceneTimer = setTimeout(advance, (scene.duration + 0.2) * 1000);
-                    try {
-                        await voiceEl.play();
-                    } catch (err) {
-                        log(`场景 ${Engine.currentIdx + 1} 配音播放失败。`, 'error');
-                        if (!scene.hasCustomDuration) advance();
-                        return;
-                    }
-                } else {
-                    Engine.sceneTimer = setTimeout(advance, scene.duration * 1000);
-                }
+                Engine.sceneTimer = setTimeout(advance, scene.duration * 1000);
             };
             DOM.player.onloadeddata = startScenePlayback;
             DOM.player.oncanplay = startScenePlayback;
@@ -3805,39 +3602,8 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                         await DOM.player.play();
                     } catch (err) {}
 
-                    if (scene.audioBuffer) {
-                        const voice = Engine.audioCtx.createBufferSource();
-                        voice.buffer = scene.audioBuffer;
-                        voice.connect(dest);
-                        voice.connect(Engine.audioCtx.destination);
-                        Engine.activeVoice = voice;
-                        try { voice.start(0); } catch (err) {
-                            console.warn(`场景 ${sceneIndex + 1} AudioBuffer 启动失败。`, err);
-                        }
-                    } else if (scene.ttsUrl) {
-                        const voiceEl = new Audio(scene.ttsUrl);
-                        voiceEl.preload = 'auto';
-                        voiceEl.playsInline = true;
-
-                        try {
-                            const voiceNode = Engine.audioCtx.createMediaElementSource(voiceEl);
-                            voiceNode.connect(dest);
-                            voiceNode.connect(Engine.audioCtx.destination);
-                            Engine.activeVoiceNode = voiceNode;
-                        } catch (err) {
-                            console.warn('分场景导出: TTS 节点创建失败。', err);
-                        }
-
-                        Engine.activeVoiceEl = voiceEl;
-                        voiceEl.onerror = () => closeWithError(new Error(`场景 ${sceneIndex + 1} 配音播放失败。`));
-                        try { await voiceEl.play(); } catch (err) {
-                            closeWithError(new Error(`场景 ${sceneIndex + 1} 配音播放失败。`));
-                            return;
-                        }
-                    }
-
                     try {
-                        startRecorderCapture(recorder, recorderSetup.mimeType);
+                        startRecorderCapture(recorder);
                     } catch (err) {
                         closeWithError(new Error(`场景 ${sceneIndex + 1} 录制启动失败。`));
                         return;
@@ -3957,6 +3723,12 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                 } else {
                     setStatus('分场景导出失败', 'error');
                 }
+            } catch (err) {
+                console.error(err);
+                const msg = err && err.message ? err.message : '分场景导出失败，请稍后重试。';
+                log(msg, 'error');
+                setStatus('分场景导出失败', 'error');
+                alert(msg);
             } finally {
                 Engine.isBatchExporting = false;
                 DOM.generateBtn.disabled = false;
