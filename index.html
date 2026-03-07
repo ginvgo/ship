@@ -179,6 +179,8 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .scene-count-pill {
@@ -215,6 +217,41 @@
         .theme-toggle:hover:not(:disabled) {
             border-color: var(--panel-hover);
             background: color-mix(in srgb, var(--surface-subtle) 78%, var(--primary));
+        }
+
+        .download-nav {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            border-radius: 999px;
+            border: 1px solid var(--panel-border);
+            background: color-mix(in srgb, var(--surface-subtle) 82%, transparent);
+        }
+
+        .mini-select {
+            width: auto;
+            min-width: 112px;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 11px;
+            line-height: 1.1;
+            background: var(--surface-input);
+        }
+
+        .mini-download {
+            border-radius: 999px;
+            padding: 6px 10px;
+            min-height: 30px;
+            font-size: 11px;
+            line-height: 1.1;
+            box-shadow: 0 6px 14px rgba(17, 153, 116, 0.24);
+            background: linear-gradient(135deg, #11a47f, #2bd7a7);
+        }
+
+        .mini-download.secondary {
+            background: linear-gradient(135deg, var(--primary-strong), var(--primary));
+            box-shadow: 0 6px 14px rgba(16, 126, 208, 0.25);
         }
 
         .workflow-strip {
@@ -352,7 +389,7 @@
             min-height: 0;
             display: grid;
             grid-template-columns: minmax(0, 1fr) clamp(420px, 42vw, 560px);
-            grid-template-rows: minmax(280px, 0.86fr) minmax(420px, 1.14fr);
+            grid-template-rows: auto auto;
             grid-template-areas:
                 "config preview"
                 "timeline preview";
@@ -364,11 +401,13 @@
         .left-panel {
             grid-area: config;
             min-height: 280px;
+            overflow: visible;
         }
 
         .middle-panel {
             grid-area: timeline;
             min-height: 420px;
+            overflow: visible;
         }
 
         .right-panel {
@@ -392,6 +431,11 @@
             min-height: 0;
             overflow: auto;
             -webkit-overflow-scrolling: touch;
+        }
+
+        .left-panel.panel,
+        .middle-panel.panel {
+            overflow: visible;
         }
 
         .panel:hover {
@@ -713,29 +757,28 @@
             box-shadow: none;
         }
 
-        .right-panel > h2 {
+        .monitor-sticky {
             position: sticky;
             top: 0;
             z-index: 8;
             background: var(--panel);
-            padding-top: 2px;
+            margin: -2px -2px 4px;
+            padding: 2px 2px 8px;
+            border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 72%, transparent);
         }
 
-        .right-panel .monitor-hints {
-            position: sticky;
-            top: 56px;
-            z-index: 7;
-            background: var(--panel);
-            padding-bottom: 3px;
+        .monitor-sticky .panel-headline {
+            margin-top: 0;
+        }
+
+        .monitor-sticky .monitor-hints {
+            padding-bottom: 4px;
         }
 
         .workspace-shell {
             flex: 0 0 auto;
             min-height: 0;
             display: flex;
-            position: sticky;
-            top: 96px;
-            z-index: 6;
             background: var(--panel);
             padding-bottom: 6px;
         }
@@ -874,10 +917,6 @@
             flex-direction: column;
             gap: 10px;
             min-width: 0;
-            position: sticky;
-            bottom: 0;
-            z-index: 6;
-            backdrop-filter: blur(6px);
         }
 
         .right-panel .toolbar-row {
@@ -1048,7 +1087,7 @@
         @media (max-width: 1520px) {
             .app-grid {
                 grid-template-columns: minmax(0, 1fr) clamp(390px, 43vw, 500px);
-                grid-template-rows: minmax(260px, 0.82fr) minmax(380px, 1.18fr);
+                grid-template-rows: auto auto;
             }
         }
 
@@ -1100,10 +1139,7 @@
                 overflow: visible;
             }
 
-            .right-panel > h2,
-            .right-panel .monitor-hints,
-            .workspace-shell,
-            .toolbar-row {
+            .monitor-sticky {
                 position: static;
                 top: auto;
             }
@@ -1127,8 +1163,22 @@
 
             .top-right {
                 width: 100%;
-                justify-content: space-between;
+                justify-content: flex-start;
                 flex-wrap: wrap;
+            }
+
+            .download-nav {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .mini-select {
+                min-width: 0;
+                flex: 1 1 38%;
+            }
+
+            .mini-download {
+                flex: 1 1 28%;
             }
 
             .workflow-strip {
@@ -1186,6 +1236,16 @@
             <span id="sceneCounter" class="scene-count-pill">场景: 1</span>
             <span class="status-pill">状态: 待命</span>
             <button type="button" id="themeToggleBtn" class="theme-toggle" aria-label="切换亮暗主题">切换明亮</button>
+            <div class="download-nav" aria-label="下载导航">
+                <select id="outputFormat" class="mini-select" title="导出格式">
+                    <option value="auto">自动格式</option>
+                    <option value="webm-vp9">WebM (VP9)</option>
+                    <option value="webm-vp8">WebM (VP8)</option>
+                    <option value="mp4">MP4 (H.264)</option>
+                </select>
+                <button id="downloadBtn" class="mini-download" disabled>下载合并</button>
+                <button id="downloadScenesBtn" class="mini-download secondary" disabled>下载分场景</button>
+            </div>
         </div>
     </header>
 
@@ -1235,28 +1295,30 @@
 
         <div class="app-grid">
             <div class="panel right-panel">
-                <h2 class="panel-headline">
-                    <div class="panel-title-wrap">
-                        <span>可视化监视器</span>
-                        <span class="panel-subtitle">拖拽文本、实时预览字幕与视频画面</span>
+                <div class="monitor-sticky">
+                    <h2 class="panel-headline">
+                        <div class="panel-title-wrap">
+                            <span>可视化监视器</span>
+                            <span class="panel-subtitle">拖拽文本、实时预览字幕与视频画面</span>
+                        </div>
+                        <div class="headline-actions">
+                            <button onclick="addTextBox()" class="btn-compact">+ 自由文本</button>
+                            <button onclick="deleteActiveTextBox()" class="btn-red btn-compact">删文本</button>
+                        </div>
+                    </h2>
+                    <div class="monitor-hints">
+                        <span class="hint-chip">双击文本可改字</span>
+                        <span class="hint-chip">拖拽角标可调字号</span>
+                        <span class="hint-chip">Delete 可快速删除</span>
                     </div>
-                    <div class="headline-actions">
-                        <button onclick="addTextBox()" class="btn-compact">+ 自由文本</button>
-                        <button onclick="deleteActiveTextBox()" class="btn-red btn-compact">删文本</button>
-                    </div>
-                </h2>
-                <div class="monitor-hints">
-                    <span class="hint-chip">双击文本可改字</span>
-                    <span class="hint-chip">拖拽角标可调字号</span>
-                    <span class="hint-chip">Delete 可快速删除</span>
-                </div>
 
-                <div class="workspace-shell">
-                    <div class="workspace">
-                        <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
-                            <video id="mediaPlayer" class="preview-media" muted playsinline></video>
-                            <div id="mainSubtitle"></div>
-                            <div id="textLayer"></div>
+                    <div class="workspace-shell">
+                        <div class="workspace">
+                            <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
+                                <video id="mediaPlayer" class="preview-media" muted playsinline></video>
+                                <div id="mainSubtitle"></div>
+                                <div id="textLayer"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1328,11 +1390,8 @@
                         <button id="generateBtn" class="btn-green btn-tall">第一步: 解析场景资产 (获取视频/配音)</button>
                         <div class="action-row">
                             <button id="playRecordBtn" class="btn-red btn-tall" disabled>第二步: 播放并录制</button>
-                            <button id="downloadBtn" class="btn-tall" disabled>第三步: 下载合并视频</button>
                         </div>
-                        <div class="action-row">
-                            <button id="downloadScenesBtn" class="btn-tall" disabled>下载每个场景视频</button>
-                        </div>
+                        <div class="panel-hint">下载入口已移动到顶部导航，支持格式切换、合并下载和分场景打包下载。</div>
                         <div id="statusLog" class="status-log">等待操作...</div>
                     </div>
                 </div>
@@ -1547,6 +1606,7 @@
             mediaRecorder: null,
             recordedChunks: [],
             mergedBlob: null,
+            currentRecorderMimeType: '',
             animFrame: null,
             activeVoice: null,
             activeVoiceEl: null,
@@ -1593,7 +1653,8 @@
             generateBtn: document.getElementById('generateBtn'),
             playRecordBtn: document.getElementById('playRecordBtn'),
             downloadBtn: document.getElementById('downloadBtn'),
-            downloadScenesBtn: document.getElementById('downloadScenesBtn')
+            downloadScenesBtn: document.getElementById('downloadScenesBtn'),
+            outputFormat: document.getElementById('outputFormat')
         };
 
         const COMMON_COLOR_PRESETS = [
@@ -2305,26 +2366,91 @@
             applySubtitleStylePreset(e.target.value, true);
         });
 
-        function getPreferredMimeType() {
-            if (typeof MediaRecorder === 'undefined') return '';
-            const candidates = [
+        const OUTPUT_FORMAT_LABELS = {
+            auto: '自动',
+            'webm-vp9': 'WebM (VP9)',
+            'webm-vp8': 'WebM (VP8)',
+            mp4: 'MP4 (H.264)'
+        };
+
+        const OUTPUT_MIME_CANDIDATES = {
+            'webm-vp9': [
                 'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp9'
+            ],
+            'webm-vp8': [
                 'video/webm;codecs=vp8,opus',
-                'video/webm;codecs=vp8',
-                'video/webm'
-            ];
+                'video/webm;codecs=vp8'
+            ],
+            mp4: [
+                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                'video/mp4;codecs=h264,aac',
+                'video/mp4'
+            ]
+        };
+
+        const AUTO_MIME_PRIORITY = [
+            ...OUTPUT_MIME_CANDIDATES['webm-vp9'],
+            ...OUTPUT_MIME_CANDIDATES['webm-vp8'],
+            ...OUTPUT_MIME_CANDIDATES.mp4,
+            'video/webm'
+        ];
+
+        function getOutputFormatKey() {
+            const raw = DOM.outputFormat ? DOM.outputFormat.value : 'auto';
+            return (raw === 'auto' || OUTPUT_MIME_CANDIDATES[raw]) ? raw : 'auto';
+        }
+
+        function getRequestedContainer(formatKey) {
+            if (formatKey === 'mp4') return 'mp4';
+            if (String(formatKey).startsWith('webm')) return 'webm';
+            return '';
+        }
+
+        function getPreferredMimeType(formatKey = getOutputFormatKey()) {
+            if (typeof MediaRecorder === 'undefined') return '';
+            const requested = formatKey !== 'auto'
+                ? (OUTPUT_MIME_CANDIDATES[formatKey] || [])
+                : [];
+            const candidates = [...new Set([...requested, ...AUTO_MIME_PRIORITY])];
             return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
         }
 
-        function createMediaRecorderForStream(stream) {
-            const mimeType = getPreferredMimeType();
-            if (!mimeType) return new MediaRecorder(stream);
-            try {
-                return new MediaRecorder(stream, { mimeType });
-            } catch (err) {
-                console.warn(`MediaRecorder 初始化 ${mimeType} 失败，降级为浏览器默认。`, err);
-                return new MediaRecorder(stream);
+        function getContainerFromMimeType(mimeType) {
+            const lower = String(mimeType || '').toLowerCase();
+            if (lower.includes('mp4')) return 'mp4';
+            if (lower.includes('webm')) return 'webm';
+            if (lower.includes('ogg') || lower.includes('ogv')) return 'ogv';
+            return '';
+        }
+
+        function createMediaRecorderForStream(stream, formatKey = getOutputFormatKey()) {
+            const requestedContainer = getRequestedContainer(formatKey);
+            const preferred = getPreferredMimeType(formatKey);
+            let recorder = null;
+
+            if (preferred) {
+                try {
+                    recorder = new MediaRecorder(stream, { mimeType: preferred });
+                } catch (err) {
+                    console.warn(`MediaRecorder 初始化 ${preferred} 失败，尝试浏览器默认。`, err);
+                }
             }
+
+            if (!recorder) recorder = new MediaRecorder(stream);
+
+            const mimeType = recorder.mimeType || preferred || 'video/webm';
+            const actualContainer = getContainerFromMimeType(mimeType);
+            const requestedLabel = OUTPUT_FORMAT_LABELS[formatKey] || OUTPUT_FORMAT_LABELS.auto;
+            const fallbackUsed = Boolean(requestedContainer && actualContainer && requestedContainer !== actualContainer);
+
+            return {
+                recorder,
+                mimeType,
+                requestedLabel,
+                actualContainer,
+                fallbackUsed
+            };
         }
 
         function requestRecorderStop(recorder, delayMs = 80) {
@@ -2749,21 +2875,157 @@
             DOM.downloadScenesBtn.disabled = !Engine.scenes.length || Engine.isBatchExporting || Engine.isPlaying;
         }
 
-        function triggerBlobDownload(blob, filenameBase) {
+        function getDownloadExtByMimeType(mimeType) {
+            const lower = String(mimeType || '').toLowerCase();
+            if (lower.includes('application/zip')) return 'zip';
+            if (lower.includes('video/mp4')) return 'mp4';
+            if (lower.includes('video/webm')) return 'webm';
+            if (lower.includes('video/ogg') || lower.includes('video/ogv')) return 'ogv';
+            return '';
+        }
+
+        function triggerNamedBlobDownload(blob, filename) {
             if (!(blob instanceof Blob) || blob.size <= 0) {
                 throw new Error('没有可下载的视频数据。');
             }
-            const outputType = blob && blob.type ? blob.type : 'video/webm';
-            const ext = outputType.includes('mp4') ? 'mp4' : 'webm';
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${filenameBase}.${ext}`;
+            a.download = filename;
             a.style.display = 'none';
             document.body.appendChild(a);
-            a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            a.click();
             a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 1800);
+        }
+
+        function triggerBlobDownload(blob, filenameBase, fallbackExt = '') {
+            const detectedExt = getDownloadExtByMimeType(blob && blob.type ? blob.type : '');
+            const ext = fallbackExt || detectedExt || 'bin';
+            triggerNamedBlobDownload(blob, `${filenameBase}.${ext}`);
+        }
+
+        const ZIP_CRC_TABLE = (() => {
+            const table = new Uint32Array(256);
+            for (let i = 0; i < 256; i++) {
+                let crc = i;
+                for (let j = 0; j < 8; j++) {
+                    crc = (crc & 1) ? (0xEDB88320 ^ (crc >>> 1)) : (crc >>> 1);
+                }
+                table[i] = crc >>> 0;
+            }
+            return table;
+        })();
+
+        function calcCrc32(bytes) {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < bytes.length; i++) {
+                crc = ZIP_CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+            }
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        function getDosDateTime(date = new Date()) {
+            const year = Math.min(2107, Math.max(1980, date.getFullYear()));
+            const month = Math.max(1, date.getMonth() + 1);
+            const day = Math.max(1, date.getDate());
+            const hours = Math.max(0, date.getHours());
+            const minutes = Math.max(0, date.getMinutes());
+            const seconds = Math.max(0, date.getSeconds());
+
+            const dosTime = (hours << 11) | (minutes << 5) | Math.floor(seconds / 2);
+            const dosDate = ((year - 1980) << 9) | (month << 5) | day;
+            return { dosDate, dosTime };
+        }
+
+        function createZipLocalHeader(nameBytes, crc32, size, dosTime, dosDate) {
+            const header = new Uint8Array(30 + nameBytes.length);
+            const view = new DataView(header.buffer);
+            view.setUint32(0, 0x04034B50, true);
+            view.setUint16(4, 20, true);
+            view.setUint16(6, 0x0800, true);
+            view.setUint16(8, 0, true);
+            view.setUint16(10, dosTime, true);
+            view.setUint16(12, dosDate, true);
+            view.setUint32(14, crc32 >>> 0, true);
+            view.setUint32(18, size >>> 0, true);
+            view.setUint32(22, size >>> 0, true);
+            view.setUint16(26, nameBytes.length, true);
+            view.setUint16(28, 0, true);
+            header.set(nameBytes, 30);
+            return header;
+        }
+
+        function createZipCentralHeader(nameBytes, crc32, size, offset, dosTime, dosDate) {
+            const header = new Uint8Array(46 + nameBytes.length);
+            const view = new DataView(header.buffer);
+            view.setUint32(0, 0x02014B50, true);
+            view.setUint16(4, 20, true);
+            view.setUint16(6, 20, true);
+            view.setUint16(8, 0x0800, true);
+            view.setUint16(10, 0, true);
+            view.setUint16(12, dosTime, true);
+            view.setUint16(14, dosDate, true);
+            view.setUint32(16, crc32 >>> 0, true);
+            view.setUint32(20, size >>> 0, true);
+            view.setUint32(24, size >>> 0, true);
+            view.setUint16(28, nameBytes.length, true);
+            view.setUint16(30, 0, true);
+            view.setUint16(32, 0, true);
+            view.setUint16(34, 0, true);
+            view.setUint16(36, 0, true);
+            view.setUint32(38, 0, true);
+            view.setUint32(42, offset >>> 0, true);
+            header.set(nameBytes, 46);
+            return header;
+        }
+
+        function createZipEndHeader(entryCount, centralSize, centralOffset) {
+            const header = new Uint8Array(22);
+            const view = new DataView(header.buffer);
+            view.setUint32(0, 0x06054B50, true);
+            view.setUint16(4, 0, true);
+            view.setUint16(6, 0, true);
+            view.setUint16(8, entryCount, true);
+            view.setUint16(10, entryCount, true);
+            view.setUint32(12, centralSize >>> 0, true);
+            view.setUint32(16, centralOffset >>> 0, true);
+            view.setUint16(20, 0, true);
+            return header;
+        }
+
+        async function buildZipBlob(files) {
+            if (!files.length) throw new Error('没有可打包的文件。');
+
+            const encoder = new TextEncoder();
+            const localParts = [];
+            const centralParts = [];
+            const { dosDate, dosTime } = getDosDateTime(new Date());
+            let localOffset = 0;
+            let centralBytes = 0;
+            let validCount = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const item = files[i];
+                if (!item || !(item.blob instanceof Blob) || item.blob.size <= 0) continue;
+                const safeName = String(item.name || `scene_${String(i + 1).padStart(2, '0')}.webm`).replace(/\\/g, '/');
+                const nameBytes = encoder.encode(safeName);
+                const data = new Uint8Array(await item.blob.arrayBuffer());
+                const size = data.length >>> 0;
+                const crc32 = calcCrc32(data);
+
+                const localHeader = createZipLocalHeader(nameBytes, crc32, size, dosTime, dosDate);
+                const centralHeader = createZipCentralHeader(nameBytes, crc32, size, localOffset, dosTime, dosDate);
+                localParts.push(localHeader, data);
+                centralParts.push(centralHeader);
+                localOffset += localHeader.length + size;
+                centralBytes += centralHeader.length;
+                validCount += 1;
+            }
+
+            if (!validCount) throw new Error('打包失败：没有可用的视频数据。');
+            const endHeader = createZipEndHeader(validCount, centralBytes, localOffset);
+            return new Blob([...localParts, ...centralParts, endHeader], { type: 'application/zip' });
         }
 
         DOM.generateBtn.onclick = async function () {
@@ -2774,6 +3036,7 @@
             DOM.downloadScenesBtn.disabled = true;
             Engine.scenes = [];
             Engine.mergedBlob = null;
+            Engine.currentRecorderMimeType = '';
             Engine.recordedChunks = [];
             clearPlaybackState();
             releaseObjectUrls();
@@ -2843,6 +3106,7 @@
                 console.error(err);
                 Engine.scenes = [];
                 Engine.mergedBlob = null;
+                Engine.currentRecorderMimeType = '';
                 log(`解析失败: ${err.message}`, 'error');
                 setStatus('解析失败', 'error');
                 alert(err.message || '资产解析失败，请检查输入后重试。');
@@ -2875,6 +3139,7 @@
             Engine.currentIdx = 0;
             Engine.recordedChunks = [];
             Engine.mergedBlob = null;
+            Engine.currentRecorderMimeType = '';
             const mergedChunks = [];
 
             const [w, h] = getTargetResolution();
@@ -2889,7 +3154,12 @@
                 startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
                 const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-                Engine.mediaRecorder = createMediaRecorderForStream(mixStream);
+                const recorderSetup = createMediaRecorderForStream(mixStream);
+                Engine.mediaRecorder = recorderSetup.recorder;
+                Engine.currentRecorderMimeType = recorderSetup.mimeType || 'video/webm';
+                if (recorderSetup.fallbackUsed) {
+                    log(`所选格式 ${recorderSetup.requestedLabel} 当前浏览器不可用，已自动切换为 ${recorderSetup.actualContainer.toUpperCase()}。`, 'error');
+                }
             } catch (err) {
                 console.error(err);
                 stopBgmSources();
@@ -2929,7 +3199,7 @@
 
                 DOM.playRecordBtn.disabled = false;
                 DOM.playRecordBtn.innerText = '重新录制';
-                const fallbackType = getPreferredMimeType() || 'video/webm';
+                const fallbackType = Engine.currentRecorderMimeType || getPreferredMimeType() || 'video/webm';
                 const mergedBlob = buildVideoBlobFromChunks(mergedChunks, fallbackType);
                 if (mergedBlob) {
                     Engine.mergedBlob = mergedBlob;
@@ -3208,7 +3478,8 @@
             startBgmSources(dest);
             const vStream = DOM.canvas.captureStream(30);
             const mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-            const recorder = createMediaRecorderForStream(mixStream);
+            const recorderSetup = createMediaRecorderForStream(mixStream);
+            const recorder = recorderSetup.recorder;
             const sceneChunks = [];
 
             return await new Promise((resolve, reject) => {
@@ -3254,7 +3525,7 @@
                     cancelAnimationFrame(Engine.animFrame);
                     resetPreviewPlaybackState();
 
-                    const outputType = getPreferredMimeType() || 'video/webm';
+                    const outputType = recorderSetup.mimeType || getPreferredMimeType() || 'video/webm';
                     const blob = buildVideoBlobFromChunks(sceneChunks, outputType);
                     if (!blob) {
                         reject(new Error(`场景 ${sceneIndex + 1} 未生成录制数据。`));
@@ -3364,6 +3635,10 @@
                 alert('请先执行第一步解析场景资产。');
                 return;
             }
+            if (typeof MediaRecorder === 'undefined') {
+                alert('当前浏览器不支持 MediaRecorder，无法导出分场景视频。');
+                return;
+            }
             if (Engine.isPlaying || Engine.isBatchExporting) return;
 
             Engine.isBatchExporting = true;
@@ -3372,14 +3647,27 @@
             DOM.downloadBtn.disabled = true;
             DOM.downloadScenesBtn.disabled = true;
             setStatus('分场景导出中', 'busy');
+            const selectedFormatKey = getOutputFormatKey();
+            const selectedPreferredMime = getPreferredMimeType(selectedFormatKey);
+            const selectedContainer = getRequestedContainer(selectedFormatKey);
+            const actualContainer = getContainerFromMimeType(selectedPreferredMime);
+            if (selectedContainer && actualContainer && selectedContainer !== actualContainer) {
+                log(`所选格式 ${OUTPUT_FORMAT_LABELS[selectedFormatKey]} 当前浏览器不可用，分场景导出将使用 ${actualContainer.toUpperCase()}。`, 'error');
+            }
 
             let successCount = 0;
+            const exportedSceneFiles = [];
+            const batchStamp = Date.now();
             try {
                 for (let i = 0; i < Engine.scenes.length; i++) {
                     log(`正在导出场景 ${i + 1}/${Engine.scenes.length}...`);
                     try {
                         const blob = await recordSingleSceneBlob(Engine.scenes[i], i, Engine.scenes.length);
-                        triggerBlobDownload(blob, `AI场景_${String(i + 1).padStart(2, '0')}_${Date.now()}`);
+                        const ext = getDownloadExtByMimeType(blob.type) || 'webm';
+                        exportedSceneFiles.push({
+                            name: `AI场景_${String(i + 1).padStart(2, '0')}_${batchStamp}.${ext}`,
+                            blob
+                        });
                         successCount += 1;
                     } catch (sceneErr) {
                         console.error(sceneErr);
@@ -3387,6 +3675,25 @@
                     }
                 }
                 if (successCount > 0) {
+                    try {
+                        if (exportedSceneFiles.length === 1) {
+                            const only = exportedSceneFiles[0];
+                            triggerNamedBlobDownload(only.blob, only.name);
+                        } else {
+                            const zipBlob = await buildZipBlob(exportedSceneFiles);
+                            triggerBlobDownload(zipBlob, `AI场景视频合集_${batchStamp}`, 'zip');
+                        }
+                    } catch (zipErr) {
+                        console.error(zipErr);
+                        log('打包下载失败，改为逐个下载。', 'error');
+                        exportedSceneFiles.forEach((item) => {
+                            try {
+                                triggerNamedBlobDownload(item.blob, item.name);
+                            } catch (singleErr) {
+                                console.error(singleErr);
+                            }
+                        });
+                    }
                     log(`分场景导出完成，成功 ${successCount}/${Engine.scenes.length}。`, 'success');
                     setStatus('分场景导出完成', 'ok');
                 } else {
