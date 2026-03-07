@@ -1305,6 +1305,89 @@
                 min-height: 220px;
             }
         }
+        /* ========== 新增 UI 样式 ========== */
+        .custom-file-upload {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .custom-file-upload input[type="file"] {
+            display: none;
+        }
+        .custom-file-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 14px;
+            border-radius: 9px;
+            background: color-mix(in srgb, var(--surface-muted) 60%, transparent);
+            border: 1px dashed var(--panel-hover);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .custom-file-btn:hover {
+            background: color-mix(in srgb, var(--primary) 15%, transparent);
+            border-color: var(--primary);
+        }
+        .file-name-hint {
+            font-size: 11px;
+            color: var(--text-soft);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 140px;
+        }
+        .bgm-custom-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 170px;
+            overflow-y: auto;
+            border: 1px solid var(--panel-border);
+            border-radius: 9px;
+            background: var(--surface-subtle);
+            padding: 6px;
+        }
+        .bgm-track-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: var(--surface-muted);
+            font-size: 11px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .bgm-track-item:hover {
+            background: color-mix(in srgb, var(--primary) 20%, var(--surface-muted));
+        }
+        .bgm-track-item.is-selected {
+            border-left: 3px solid var(--primary);
+            background: color-mix(in srgb, var(--primary) 12%, transparent);
+        }
+        .bgm-track-info {
+            display: flex; align-items: center; gap: 8px; overflow: hidden;
+        }
+        .bgm-track-name {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;
+        }
+        .bgm-track-del {
+            background: none; border: none; color: var(--danger); cursor: pointer;
+            padding: 2px 6px; font-size: 14px; border-radius: 4px; box-shadow: none;
+        }
+        .bgm-track-del:hover {
+            background: color-mix(in srgb, var(--danger) 15%, transparent); transform: none; filter: none;
+        }
+        .bgm-empty-hint {
+            padding: 20px; text-align: center; color: var(--text-soft); font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -1413,6 +1496,13 @@
                     <div class="panel-section">
                         <h3>主字幕样式</h3>
                         <div class="panel-hint">主字幕样式会应用到整段视频，建议在录制前统一校准。</div>
+                        
+                        <!-- 新增：主字幕预览测试 -->
+                        <div class="ctrl-group">
+                            <label style="color:var(--accent);">预览测试文字</label>
+                            <input type="text" id="previewSubtitleText" placeholder="在此输入用于预览的测试文本..." value="主字幕样式预览" oninput="updateMainSubtitlePreview()">
+                        </div>
+
                         <div class="ctrl-group">
                             <label>字体库</label>
                             <select id="fontFamily">
@@ -1527,7 +1617,7 @@
                     </div>
                 </div>
 
-                <div class="panel module-pane" data-module="music">
+<div class="panel module-pane" data-module="music">
                     <div class="module-pane-head">
                         <div class="module-pane-title">
                             <span>Music · 背景音乐</span>
@@ -1535,18 +1625,27 @@
                         </div>
                     </div>
                     <div class="ctrl-group">
-                        <label>背景音乐库 (可多选)</label>
-                        <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
-                        <div class="bgm-library">
-                            <select id="bgmLibraryList" class="bgm-list" multiple></select>
-                            <div class="bgm-actions">
-                                <button type="button" id="removeBgmBtn" class="btn-red">移除所选</button>
-                                <button type="button" id="clearBgmBtn">清空音乐库</button>
-                            </div>
-                            <div class="bgm-hint">从列表中按住 Ctrl/Command 可多选，录制时会混合播放。</div>
+                        <label>添加音乐到曲库</label>
+                        <div class="custom-file-upload">
+                            <input type="file" id="bgmInput" accept="audio/mp3,audio/wav,audio/mpeg,audio/*" multiple>
+                            <label for="bgmInput" class="custom-file-btn">🎵 选择本地音乐</label>
+                            <span class="file-name-hint">支持多选，点击列表项可切换播放</span>
                         </div>
-                        <label>音量调节: <span id="bgmVolVal">15%</span></label>
-                        <input type="range" id="bgmVolume" min="0" max="1" step="0.05" value="0.15" oninput="document.getElementById('bgmVolVal').innerText = Math.round(this.value*100)+'%'">
+                        
+                        <!-- 全新的可视化曲库列表 -->
+                        <div class="bgm-library" style="border:none; padding:0; background:transparent;">
+                            <div id="bgmCustomList" class="bgm-custom-list"></div>
+                            <div class="bgm-actions" style="margin-top: 8px;">
+                                <button type="button" id="clearBgmBtn" class="btn-compact" style="background: var(--surface-subtle); color: var(--text); border: 1px solid var(--panel-border); box-shadow: none;">清空列表</button>
+                            </div>
+                        </div>
+
+                        <label>音量调节</label>
+                        <div class="duration-input-wrap">
+                            <input type="range" id="bgmVolume" min="0" max="100" step="1" value="15">
+                            <input type="number" id="bgmVolumeNum" min="0" max="100" value="15" style="width: 65px; flex: 0 0 auto; text-align: center;">
+                            <span style="font-size: 12px; color: var(--text-soft);">%</span>
+                        </div>
                     </div>
                 </div>
 
@@ -2022,7 +2121,11 @@ function addScene() {
 
                     <div id="input-local-${id}" class="ctrl-group" style="display:none;">
                         <label>本地视频文件</label>
-                        <input type="file" id="file-${id}" accept="video/*">
+                        <div class="custom-file-upload">
+                            <input type="file" id="file-${id}" accept="video/*" onchange="document.getElementById('file-hint-${id}').innerText = this.files.length ? this.files[0].name : '未选择文件';">
+                            <label for="file-${id}" class="custom-file-btn">📁 选择本地视频</label>
+                            <span class="file-name-hint" id="file-hint-${id}">未选择文件</span>
+                        </div>
                     </div>
 
                     <div class="ctrl-group">
@@ -3757,6 +3860,150 @@ const dest = Engine.audioCtx.createMediaStreamDestination();
         refreshBgmLibraryList();
         updateActionButtons();
         updateSettingsOverview();
+
+        // ======================= 新增逻辑替换区 =======================
+
+        // 【1】字幕预览测试支持
+        function updateMainSubtitlePreview() {
+            const previewEl = document.getElementById('previewSubtitleText');
+            if (previewEl && !Engine.isPlaying) {
+                DOM.subtitle.innerText = previewEl.value;
+                applySubtitlePreviewStyle();
+            }
+        }
+        function resetPreviewPlaybackState() {
+            DOM.player.pause();
+            DOM.player.loop = false;
+            DOM.player.removeAttribute('src');
+            DOM.player.load();
+            DOM.player.style.display = 'none';
+            // 恢复预览字幕
+            updateMainSubtitlePreview();
+        }
+
+        // 【2】保护录制启动 Bug ("Cannot read properties of null")
+        function createMediaRecorderForStream(stream, formatKey = getOutputFormatKey()) {
+            const requestedContainer = getRequestedContainer(formatKey);
+            const preferred = getPreferredMimeType(formatKey);
+            let recorder = null;
+            if (preferred) {
+                try { recorder = new MediaRecorder(stream, { mimeType: preferred }); } catch (err) {}
+            }
+            if (!recorder) {
+                try { recorder = new MediaRecorder(stream); } catch(e) { console.warn('默认 Recorder 也失败', e); }
+            }
+            if (!recorder) throw new Error("无法创建 MediaRecorder，由于该视频格式在此浏览器环境不可用。");
+            
+            const mimeType = recorder.mimeType || preferred || 'video/webm';
+            const actualContainer = getContainerFromMimeType(mimeType);
+            const fallbackUsed = Boolean(requestedContainer && actualContainer && requestedContainer !== actualContainer);
+            return { recorder, mimeType, requestedLabel: OUTPUT_FORMAT_LABELS[formatKey] || OUTPUT_FORMAT_LABELS.auto, actualContainer, fallbackUsed };
+        }
+
+        function startRecorderCapture(recorder) {
+            if (!recorder) throw new Error("录制器实例丢失 (null)，请检查浏览器兼容性或媒体流。");
+            recorder.start();
+        }
+
+        // 【3】新的美化版音乐库逻辑
+        function addBgmFilesToLibrary(fileList) {
+            const files = [...(fileList || [])];
+            if (!files.length) return;
+            files.forEach((file) => {
+                const id = `${file.name}__${file.size}`;
+                if (Engine.bgmLibrary.some(item => item.id === id)) return;
+                Engine.bgmLibrary.push({ id, name: file.name, file, buffer: null, selected: true }); // 默认选中
+            });
+            refreshBgmLibraryList();
+        }
+
+        function refreshBgmLibraryList() {
+            const container = document.getElementById('bgmCustomList');
+            if (!container) return;
+            container.innerHTML = '';
+            if (Engine.bgmLibrary.length === 0) {
+                container.innerHTML = '<div class="bgm-empty-hint">暂无音乐，请添加本地音频文件</div>';
+                updateSettingsOverview();
+                return;
+            }
+            Engine.bgmLibrary.forEach((entry, idx) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `bgm-track-item ${entry.selected !== false ? 'is-selected' : ''}`;
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'bgm-track-info';
+                
+                itemDiv.addEventListener('click', (e) => {
+                    if (e.target.tagName.toLowerCase() === 'button') return; 
+                    entry.selected = entry.selected === false ? true : false;
+                    refreshBgmLibraryList();
+                });
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'bgm-track-name';
+                nameSpan.innerText = `${idx + 1}. ${entry.name}`;
+                nameSpan.title = entry.name;
+                infoDiv.appendChild(nameSpan);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bgm-track-del';
+                delBtn.innerHTML = '×';
+                delBtn.title = '移除此首';
+                delBtn.addEventListener('click', () => {
+                    Engine.bgmLibrary = Engine.bgmLibrary.filter(item => item.id !== entry.id);
+                    refreshBgmLibraryList();
+                });
+
+                itemDiv.appendChild(infoDiv);
+                itemDiv.appendChild(delBtn);
+                container.appendChild(itemDiv);
+            });
+            updateSettingsOverview();
+        }
+
+        function getSelectedBgmEntries() {
+            return Engine.bgmLibrary.filter(item => item.selected !== false);
+        }
+
+        // 【4】数字与滑块音量联动同步
+        const domVolume = document.getElementById('bgmVolume');
+        const domVolumeNum = document.getElementById('bgmVolumeNum');
+        if (domVolume && domVolumeNum) {
+            domVolume.addEventListener('input', (e) => {
+                domVolumeNum.value = e.target.value;
+                updateSettingsOverview();
+            });
+            domVolumeNum.addEventListener('input', (e) => {
+                let val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                domVolume.value = val;
+                updateSettingsOverview();
+            });
+        }
+        
+        // 覆盖音量读取逻辑
+        function startBgmSources(dest) {
+            stopBgmSources();
+            if (!Engine.bgmBuffers.length || !Engine.audioCtx) return;
+            // 读取最新的体积数值 (0-100 转为 0-1)
+            const volume = (Number(document.getElementById('bgmVolume').value) || 0) / 100;
+            const trackCount = Math.max(1, Engine.bgmBuffers.length);
+            const perTrackVol = volume / Math.sqrt(trackCount);
+
+            Engine.activeBgmSources = Engine.bgmBuffers.map((buffer) => {
+                const src = Engine.audioCtx.createBufferSource();
+                const gain = Engine.audioCtx.createGain();
+                src.buffer = buffer;
+                src.loop = true;
+                gain.gain.value = perTrackVol;
+                src.connect(gain).connect(dest);
+                gain.connect(Engine.audioCtx.destination);
+                src.start(0);
+                return { src, gain };
+            });
+        }
+        
+        // 初始化时设置默认测试字幕
+        setTimeout(() => updateMainSubtitlePreview(), 100);
     </script>
 </body>
 </html>
