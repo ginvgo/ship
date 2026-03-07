@@ -1560,7 +1560,6 @@
 
             <div class="panel right-panel">
                 <div class="monitor-sticky">
-                    <!-- 精简头部，去掉了底边框和多余说明 -->
                     <h2 class="panel-headline" style="border-bottom: none; padding-bottom: 4px;">
                         <span>可视化监视器</span>
                     </h2>
@@ -1576,19 +1575,9 @@
                     </div>
                 </div>
             </div>
-                    <div class="workspace-shell">
-                        <div class="workspace">
-                            <div class="preview-box" id="previewBox" style="aspect-ratio: 16/9;">
-                                <video id="mediaPlayer" class="preview-media" muted playsinline></video>
-                                <div id="mainSubtitle"></div>
-                                <div id="textLayer"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        </div> <!-- 闭合 app-grid -->
+    </div> <!-- 闭合 studio-shell -->
+                    
 
     <canvas id="renderCanvas" width="1920" height="1080"></canvas>
 
