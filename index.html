@@ -1805,6 +1805,7 @@
             currentRecorderMimeType: '',
             animFrame: null,
             activeBgmSources: [],
+            bgmDestination: null,
             sceneTimer: null,
             objectUrls: [],
             subtitleStyleKey: 'classic',
@@ -1974,12 +1975,14 @@
 
             if (DOM.overviewMusic) {
                 const allCount = Engine.bgmLibrary.length;
-                const selectedCount = DOM.bgmLibraryList
-                    ? DOM.bgmLibraryList.selectedOptions.length
-                    : Engine.bgmLibrary.filter(item => item.selected !== false).length;
+                const sceneUseCount = [...document.querySelectorAll('.scene-card')]
+                    .filter((card) => {
+                        const id = card.dataset.sceneId;
+                        return Boolean(document.getElementById(`sceneBgm-${id}`)?.value || '');
+                    }).length;
                 const rawVol = parseFloat(DOM.bgmVolume?.value || '0') || 0;
                 const vol = rawVol <= 1 ? Math.round(rawVol * 100) : Math.round(rawVol);
-                DOM.overviewMusic.innerText = `${allCount} 首(${selectedCount}) · ${vol}%`;
+                DOM.overviewMusic.innerText = `${allCount} 首 · ${sceneUseCount} 场已选 · ${vol}%`;
             }
 
             if (DOM.overviewExport) {
@@ -2115,6 +2118,13 @@ function addScene() {
                             </div>
                             <span class="duration-hint">0 = 自动估算</span>
                         </div>
+
+                        <div class="ctrl-group">
+                            <label>场景 BGM</label>
+                            <select id="sceneBgm-${id}">
+                                <option value="">无背景音乐</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div id="input-pexels-${id}" class="ctrl-group">
@@ -2138,7 +2148,27 @@ function addScene() {
                 </div>
             `;
             document.getElementById('scenesContainer').insertAdjacentHTML('beforeend', html);
+            refreshSceneBgmSelectors();
             updateSceneCounter();
+        }
+
+        function refreshSceneBgmSelectors() {
+            const cards = [...document.querySelectorAll('.scene-card')];
+            cards.forEach((card) => {
+                const id = card.dataset.sceneId;
+                const select = document.getElementById(`sceneBgm-${id}`);
+                if (!select) return;
+                const prevValue = select.value || '';
+                select.innerHTML = '<option value="">无背景音乐</option>';
+                Engine.bgmLibrary.forEach((entry, idx) => {
+                    const option = document.createElement('option');
+                    option.value = entry.id;
+                    option.text = `${idx + 1}. ${entry.name}`;
+                    select.appendChild(option);
+                });
+                const stillExists = prevValue && Engine.bgmLibrary.some(item => item.id === prevValue);
+                select.value = stillExists ? prevValue : '';
+            });
         }
 
         function setAutoDuration(id) {
@@ -2904,18 +2934,19 @@ function requestRecorderStop(recorder, delayMs = 150) {
                 const id = card.dataset.sceneId;
                 const source = document.getElementById(`source-${id}`).value;
                 const text = document.getElementById(`text-${id}`).value.trim();
+                const sceneBgmId = document.getElementById(`sceneBgm-${id}`)?.value || '';
                 const customDuration = readCustomSceneDuration(id);
                 const hasCustomDuration = customDuration > 0;
 
                 if (source === 'pexels') {
                     const keyword = document.getElementById(`keyword-${id}`).value.trim();
                     if (!keyword) throw new Error(`场景 ${idx + 1} 请选择关键词。`);
-                    return { idx, id, source, keyword, text, customDuration, hasCustomDuration };
+                    return { idx, id, source, keyword, text, sceneBgmId, customDuration, hasCustomDuration };
                 }
 
                 const file = document.getElementById(`file-${id}`).files[0];
                 if (!file) throw new Error(`请为场景 ${idx + 1} 上传本地视频。`);
-                return { idx, id, source, file, text, customDuration, hasCustomDuration };
+                return { idx, id, source, file, text, sceneBgmId, customDuration, hasCustomDuration };
             });
         }
 
@@ -2972,7 +3003,15 @@ function requestRecorderStop(recorder, delayMs = 150) {
         }
 
         async function decodeSelectedBgmBuffers() {
-            const selected = getSelectedBgmEntries();
+            const requiredIds = new Set(
+                [...document.querySelectorAll('.scene-card')]
+                    .map(card => {
+                        const id = card.dataset.sceneId;
+                        return document.getElementById(`sceneBgm-${id}`)?.value || '';
+                    })
+                    .filter(Boolean)
+            );
+            const selected = Engine.bgmLibrary.filter(entry => requiredIds.has(entry.id));
             if (!selected.length) {
                 Engine.bgmBuffers = [];
                 return;
@@ -2990,6 +3029,12 @@ function requestRecorderStop(recorder, delayMs = 150) {
                 }
             });
             Engine.bgmBuffers = decoded.filter(Boolean);
+        }
+
+        function getSceneBgmBuffer(scene) {
+            if (!scene || !scene.sceneBgmId) return null;
+            const entry = Engine.bgmLibrary.find(item => item.id === scene.sceneBgmId);
+            return entry && entry.buffer ? entry.buffer : null;
         }
 
         function stopBgmSources() {
@@ -3056,6 +3101,7 @@ function requestRecorderStop(recorder, delayMs = 150) {
                         source,
                         keyword: document.getElementById(`keyword-${id}`)?.value.trim() || '',
                         text: document.getElementById(`text-${id}`)?.value.trim() || '',
+                        sceneBgmId: document.getElementById(`sceneBgm-${id}`)?.value || '',
                         duration: document.getElementById(`duration-${id}`)?.value || '0',
                         file: getFileFingerprint(document.getElementById(`file-${id}`)?.files?.[0] || null)
                     };
@@ -3293,6 +3339,7 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                     id: draft.id,
                     videoUrl,
                     text: draft.text,
+                    sceneBgmId: draft.sceneBgmId || '',
                     videoDuration,
                     duration: Math.max(0.5, duration || 4),
                     hasCustomDuration: draft.hasCustomDuration
@@ -3317,23 +3364,29 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             drawBlackFrameToCanvas();
 
             clearPlaybackState();
+            stopBgmSources();
             Engine.isPlaying = true;
             Engine.currentIdx = 0;
             Engine.recordedChunks = [];
             Engine.mergedBlob = null;
             Engine.currentRecorderMimeType = '';
+            Engine.bgmDestination = null;
 
-let mixStream = null;
+            let mixStream = null;
             let recorderSetup = null;
             try {
                 const vStream = DOM.canvas.captureStream(30);
-                if (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) {
-                    const dest = Engine.audioCtx.createMediaStreamDestination();
-                    startBgmSources(dest);
-                    mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                const hasAnySceneBgm = Engine.scenes.some(scene => Boolean(getSceneBgmBuffer(scene)));
+                if (hasAnySceneBgm && Engine.audioCtx) {
+                    Engine.bgmDestination = Engine.audioCtx.createMediaStreamDestination();
+                    mixStream = new MediaStream([
+                        ...vStream.getVideoTracks(),
+                        ...Engine.bgmDestination.stream.getAudioTracks()
+                    ]);
                 } else {
                     // 【修复核心】：如果没有音乐，纯纯只用视频轨，绝不塞入空音频轨，避免录制器报错和文件损坏
                     mixStream = new MediaStream(vStream.getVideoTracks());
+                    Engine.bgmDestination = null;
                 }
                 recorderSetup = createMediaRecorderForStream(mixStream);
                 Engine.mediaRecorder = recorderSetup ? recorderSetup.recorder : null;
@@ -3344,6 +3397,7 @@ let mixStream = null;
             
                 stopBgmSources();
                 stopStreamTracks(mixStream);
+                Engine.bgmDestination = null;
                 Engine.mediaRecorder = null;
                 Engine.isPlaying = false;
                 cancelAnimationFrame(Engine.animFrame);
@@ -3368,6 +3422,7 @@ let mixStream = null;
             } catch (err) {
                 stopBgmSources();
                 stopStreamTracks(mixStream);
+                Engine.bgmDestination = null;
                 Engine.mediaRecorder = null;
                 Engine.isPlaying = false;
                 cancelAnimationFrame(Engine.animFrame);
@@ -3385,6 +3440,7 @@ let mixStream = null;
                 clearPlaybackState();
                 stopBgmSources();
                 stopStreamTracks(mixStream);
+                Engine.bgmDestination = null;
                 Engine.isPlaying = false;
                 cancelAnimationFrame(Engine.animFrame);
                 Engine.animFrame = null;
@@ -3445,6 +3501,7 @@ let mixStream = null;
             if (!Engine.isPlaying) return;
 
             if (Engine.currentIdx >= Engine.scenes.length) {
+                stopBgmSources();
                 setTimeout(() => {
                     if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
                         requestRecorderStop(Engine.mediaRecorder, 220);
@@ -3456,6 +3513,7 @@ let mixStream = null;
             clearPlaybackState();
             const scene = Engine.scenes[Engine.currentIdx];
             log(`正在渲染场景 ${Engine.currentIdx + 1}/${Engine.scenes.length}...`);
+            if (Engine.bgmDestination) stopBgmSources();
 
             DOM.player.style.display = 'block';
             DOM.player.loop = scene.duration > (scene.videoDuration || 0) + 0.05;
@@ -3499,6 +3557,10 @@ let mixStream = null;
                     try {
                         await seekPlayerTo(startOffset, 900);
                     } catch (err) {}
+                }
+                if (Engine.bgmDestination) {
+                    const sceneBgmBuffer = getSceneBgmBuffer(scene);
+                    startBgmSources(Engine.bgmDestination, sceneBgmBuffer ? [sceneBgmBuffer] : []);
                 }
                 try { await DOM.player.play(); } catch (e) {}
                 Engine.sceneTimer = setTimeout(advance, scene.duration * 1000);
@@ -3637,14 +3699,18 @@ let mixStream = null;
             DOM.canvas.height = h;
             drawBlackFrameToCanvas();
 
-let mixStream = null;
+            let mixStream = null;
             let recorderSetup = null;
+            let sceneBgmDest = null;
+            const sceneBgmBuffer = getSceneBgmBuffer(scene);
             try {
                 const vStream = DOM.canvas.captureStream(30);
-                if (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) {
-                    const dest = Engine.audioCtx.createMediaStreamDestination();
-                    startBgmSources(dest);
-                    mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                if (sceneBgmBuffer && Engine.audioCtx) {
+                    sceneBgmDest = Engine.audioCtx.createMediaStreamDestination();
+                    mixStream = new MediaStream([
+                        ...vStream.getVideoTracks(),
+                        ...sceneBgmDest.stream.getAudioTracks()
+                    ]);
                 } else {
                     mixStream = new MediaStream(vStream.getVideoTracks());
                 }
@@ -3721,6 +3787,9 @@ let mixStream = null;
                         try {
                             await seekPlayerTo(startOffset, 900);
                         } catch (err) {}
+                    }
+                    if (sceneBgmDest && sceneBgmBuffer) {
+                        startBgmSources(sceneBgmDest, [sceneBgmBuffer]);
                     }
                     try {
                         await DOM.player.play();
@@ -3939,6 +4008,7 @@ let mixStream = null;
             container.innerHTML = '';
             if (Engine.bgmLibrary.length === 0) {
                 container.innerHTML = '<div class="bgm-empty-hint">暂无音乐，请添加本地音频文件</div>';
+                refreshSceneBgmSelectors();
                 updateSettingsOverview();
                 return;
             }
@@ -3974,6 +4044,7 @@ let mixStream = null;
                 itemDiv.appendChild(delBtn);
                 container.appendChild(itemDiv);
             });
+            refreshSceneBgmSelectors();
             updateSettingsOverview();
         }
 
@@ -3996,16 +4067,29 @@ let mixStream = null;
             });
         }
         
-        // 覆盖音量读取逻辑
-        function startBgmSources(dest) {
+        // 覆盖音量读取逻辑（支持按场景传入单轨）
+        function startBgmSources(dest, entries = null) {
             stopBgmSources();
-            if (!Engine.bgmBuffers.length || !Engine.audioCtx) return;
+            if (!dest || !Engine.audioCtx) return;
+            const hasExplicitEntries = entries !== null && entries !== undefined;
+            const inputList = hasExplicitEntries
+                ? (Array.isArray(entries) ? entries : [entries])
+                : [];
+            const picked = hasExplicitEntries ? inputList : Engine.bgmBuffers;
+            const buffers = picked
+                .map((item) => {
+                    if (item && typeof item.getChannelData === 'function') return item;
+                    if (item && item.buffer && typeof item.buffer.getChannelData === 'function') return item.buffer;
+                    return null;
+                })
+                .filter(Boolean);
+            if (!buffers.length) return;
             // 读取最新的体积数值 (0-100 转为 0-1)
             const volume = (Number(document.getElementById('bgmVolume').value) || 0) / 100;
-            const trackCount = Math.max(1, Engine.bgmBuffers.length);
+            const trackCount = Math.max(1, buffers.length);
             const perTrackVol = volume / Math.sqrt(trackCount);
 
-            Engine.activeBgmSources = Engine.bgmBuffers.map((buffer) => {
+            Engine.activeBgmSources = buffers.map((buffer) => {
                 const src = Engine.audioCtx.createBufferSource();
                 const gain = Engine.audioCtx.createGain();
                 src.buffer = buffer;
