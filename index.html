@@ -732,9 +732,9 @@
             animation: cardIn 0.22s ease;
         }
 
-        .scene-meta-grid {
+.scene-meta-grid {
             display: grid;
-            grid-template-columns: 1.25fr 1fr;
+            grid-template-columns: 1.25fr 1fr 1fr; /* 改为3列：来源稍宽，时长和配音等宽 */
             gap: 10px;
         }
 
@@ -2008,7 +2008,7 @@
             }
         }
 
-        function addScene() {
+function addScene() {
             sceneCount++;
             const id = sceneCount;
             const html = `
@@ -2018,6 +2018,7 @@
                         <button class="scene-remove" onclick="removeScene(${id})">删除</button>
                     </div>
 
+                    <!-- 【修改位置】现在这个 Grid 包含了 来源、时长、配音 三个区块 -->
                     <div class="scene-meta-grid">
                         <div class="ctrl-group">
                             <label>素材来源</label>
@@ -2026,13 +2027,25 @@
                                 <option value="local">上传本地视频素材</option>
                             </select>
                         </div>
+                        
                         <div class="ctrl-group">
                             <label>时长秒数</label>
                             <div class="duration-input-wrap">
                                 <input type="number" id="duration-${id}" min="0" max="600" step="0.5" value="0" placeholder="0=自动">
                                 <button type="button" class="chip-btn" onclick="setAutoDuration(${id})">自动</button>
                             </div>
-                            <span class="duration-hint">0 = 自动按配音/视频时长</span>
+                            <span class="duration-hint">0 = 自动估算</span>
+                        </div>
+
+                        <!-- 移入此处的配音角色 -->
+                        <div class="ctrl-group">
+                            <label>配音角色</label>
+                            <select id="voice-${id}">
+                                <option value="1">标准男声</option>
+                                <option value="0">标准女声</option>
+                                <option value="3">情感男声(度逍遥)</option>
+                                <option value="4">童音(度丫丫)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -2044,16 +2057,6 @@
                     <div id="input-local-${id}" class="ctrl-group" style="display:none;">
                         <label>本地视频文件</label>
                         <input type="file" id="file-${id}" accept="video/*">
-                    </div>
-
-                    <div class="ctrl-group">
-                        <label>配音角色</label>
-                        <select id="voice-${id}">
-                            <option value="1">标准男声</option>
-                            <option value="0">标准女声</option>
-                            <option value="3">情感男声(度逍遥)</option>
-                            <option value="4">童音(度丫丫)</option>
-                        </select>
                     </div>
 
                     <div class="ctrl-group">
