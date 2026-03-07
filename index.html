@@ -2599,10 +2599,13 @@ function addScene() {
 
 function requestRecorderStop(recorder, delayMs = 150) {
             if (!recorder || recorder.state === 'inactive') return;
-            // 移除 requestData，直接使用延时 stop，让浏览器自行处理最后的关键帧
             setTimeout(() => {
                 if (recorder.state !== 'inactive') {
-                    try { recorder.stop(); } catch (err) {}
+                    try { 
+                        // 【修复】必须调用 requestData 强制刷新最后的数据块（尤其是 MP4 格式）
+                        recorder.requestData(); 
+                        recorder.stop(); 
+                    } catch (err) {}
                 }
             }, delayMs);
         }
@@ -2970,15 +2973,13 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
                 };
                 
                 recorder.onstop = () => {
-                    // 等待 150ms 确保浏览器底层已将最后一个 ondataavailable 抛出
-                    setTimeout(() => {
-                        const blob = buildVideoBlobFromChunks(chunks, fallbackType);
-                        if (!blob) {
-                            reject(new Error(emptyMessage));
-                            return;
-                        }
-                        resolve(blob);
-                    }, 150);
+                    // 【修复】移除 setTimeout。onstop 触发时，最后的关键帧必然已经进入 chunks 数组
+                    const blob = buildVideoBlobFromChunks(chunks, fallbackType);
+                    if (!blob) {
+                        reject(new Error(emptyMessage));
+                        return;
+                    }
+                    resolve(blob);
                 };
             });
         }
@@ -3329,7 +3330,6 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             if (!Engine.isPlaying) return;
 
             if (Engine.currentIdx >= Engine.scenes.length) {
-                Engine.isPlaying = false;
                 setTimeout(() => {
                     if (Engine.mediaRecorder && Engine.mediaRecorder.state !== 'inactive') {
                         requestRecorderStop(Engine.mediaRecorder, 220);
