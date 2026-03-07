@@ -3336,6 +3336,10 @@ let mixStream = null;
                     mixStream = new MediaStream(vStream.getVideoTracks());
                 }
                 recorderSetup = createMediaRecorderForStream(mixStream);
+                Engine.mediaRecorder = recorderSetup ? recorderSetup.recorder : null;
+                if (!Engine.mediaRecorder) {
+                    throw new Error('录制器创建失败：未返回有效实例。');
+                }
             } catch (err) {
             
                 stopBgmSources();
