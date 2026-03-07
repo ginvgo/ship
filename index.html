@@ -3316,17 +3316,18 @@ function collectRecorderBlob(recorder, chunks, fallbackType, emptyMessage) {
             Engine.mergedBlob = null;
             Engine.currentRecorderMimeType = '';
 
-const dest = Engine.audioCtx.createMediaStreamDestination();
-            let mixStream = null;
+let mixStream = null;
             let recorderSetup = null;
             try {
-                startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
-                
-                // 【修复】分场景导出时同样要过滤空音轨
-                const audioTracks = (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) ? dest.stream.getAudioTracks() : [];
-                mixStream = new MediaStream([...vStream.getVideoTracks(), ...audioTracks]);
-                
+                if (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) {
+                    const dest = Engine.audioCtx.createMediaStreamDestination();
+                    startBgmSources(dest);
+                    mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                } else {
+                    // 【修复核心】：如果没有音乐，纯纯只用视频轨，绝不塞入空音频轨，避免录制器报错和文件损坏
+                    mixStream = new MediaStream(vStream.getVideoTracks());
+                }
                 recorderSetup = createMediaRecorderForStream(mixStream);
             } catch (err) {
             
@@ -3553,8 +3554,11 @@ const dest = Engine.audioCtx.createMediaStreamDestination();
                 const boxHeight = lines.length * lineHeight + 24;
                 const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width), 100);
                 const boxWidth = Math.min(w * 0.92, maxLineWidth + 44);
-                const boxX = (w - boxWidth) / 2;
-                const boxY = h * 0.89 - boxHeight;
+// 【核心升级】读取动态拖拽坐标，若没有则默认居中靠下
+                const subX = (Engine.mainSubState ? Engine.mainSubState.x_pct : 0.5) * w;
+                const subY = (Engine.mainSubState ? Engine.mainSubState.y_pct : 0.89) * h;
+                const boxX = subX - boxWidth / 2;
+                const boxY = subY - boxHeight / 2;
 
                 ctx.fillStyle = subtitleStyle.boxColor;
                 ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
@@ -3570,8 +3574,9 @@ const dest = Engine.audioCtx.createMediaStreamDestination();
 
                 lines.forEach((line, i) => {
                     const lineY = boxY + 12 + i * lineHeight;
-                    ctx.strokeText(line, w / 2, lineY);
-                    ctx.fillText(line, w / 2, lineY);
+                    // 同步 X 坐标
+                    ctx.strokeText(line, subX, lineY);
+                    ctx.fillText(line, subX, lineY);
                 });
 
                 ctx.shadowBlur = 0;
@@ -3621,17 +3626,17 @@ const dest = Engine.audioCtx.createMediaStreamDestination();
             DOM.canvas.height = h;
             drawBlackFrameToCanvas();
 
-const dest = Engine.audioCtx.createMediaStreamDestination();
-            let mixStream = null;
+let mixStream = null;
             let recorderSetup = null;
             try {
-                startBgmSources(dest);
                 const vStream = DOM.canvas.captureStream(30);
-                
-                // 【修复】判断是否有音频缓冲数据。如果没有音乐，就不要塞入空的音频轨
-                const audioTracks = (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) ? dest.stream.getAudioTracks() : [];
-                mixStream = new MediaStream([...vStream.getVideoTracks(), ...audioTracks]);
-                
+                if (Engine.bgmBuffers && Engine.bgmBuffers.length > 0) {
+                    const dest = Engine.audioCtx.createMediaStreamDestination();
+                    startBgmSources(dest);
+                    mixStream = new MediaStream([...vStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+                } else {
+                    mixStream = new MediaStream(vStream.getVideoTracks());
+                }
                 recorderSetup = createMediaRecorderForStream(mixStream);
                 
             } catch (err) {
@@ -4004,6 +4009,89 @@ const dest = Engine.audioCtx.createMediaStreamDestination();
         
         // 初始化时设置默认测试字幕
         setTimeout(() => updateMainSubtitlePreview(), 100);
+
+
+        // ======================= 主字幕高级交互与预览引擎 =======================
+        
+        // 1. 初始化主字幕状态 (默认居中偏下)
+        Engine.mainSubState = { x_pct: 0.5, y_pct: 0.89, isDragging: false };
+        
+        // 2. 赋予主字幕基础样式使其支持交互
+        DOM.subtitle.style.pointerEvents = 'auto';
+        DOM.subtitle.style.cursor = 'grab';
+        DOM.subtitle.style.bottom = 'auto'; // 取消底部锁定
+        DOM.subtitle.style.left = '50%';
+        DOM.subtitle.style.top = '89%';
+        DOM.subtitle.style.transform = 'translate(-50%, -50%)'; // 保证锚点在中心
+        DOM.subtitle.title = "按住拖动调整位置，使用鼠标滚轮直接缩放大小";
+
+        // 3. 监听文本框输入，实现实时预览
+        document.getElementById('scenesContainer').addEventListener('input', (e) => {
+            if (e.target.tagName.toLowerCase() === 'textarea' && e.target.id.startsWith('text-')) {
+                if (!Engine.isPlaying) {
+                    DOM.subtitle.innerText = e.target.value;
+                    applySubtitlePreviewStyle();
+                }
+            }
+        });
+        document.getElementById('scenesContainer').addEventListener('focusin', (e) => {
+            if (e.target.tagName.toLowerCase() === 'textarea' && e.target.id.startsWith('text-')) {
+                if (!Engine.isPlaying) {
+                    DOM.subtitle.innerText = e.target.value;
+                    applySubtitlePreviewStyle();
+                }
+            }
+        });
+
+        // 4. 滚轮直接缩放字幕大小
+        DOM.subtitle.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const fontSizeInput = document.getElementById('fontSize');
+            let currentSize = Number(fontSizeInput.value) || 55;
+            // 向上滚放大，向下滚缩小
+            currentSize -= e.deltaY * 0.05;
+            currentSize = Math.max(16, Math.min(150, currentSize));
+            fontSizeInput.value = Math.round(currentSize);
+            applySubtitlePreviewStyle();
+            updateSettingsOverview();
+        });
+
+        // 5. 拖拽核心逻辑
+        let mainDragStartX = 0, mainDragStartY = 0, mainStartXPct = 0, mainStartYPct = 0;
+        DOM.subtitle.addEventListener('pointerdown', (e) => {
+            Engine.mainSubState.isDragging = true;
+            mainDragStartX = e.clientX;
+            mainDragStartY = e.clientY;
+            mainStartXPct = Engine.mainSubState.x_pct;
+            mainStartYPct = Engine.mainSubState.y_pct;
+            DOM.subtitle.style.cursor = 'grabbing';
+            e.preventDefault();
+            e.stopPropagation(); // 防止触发其他点击
+        });
+
+        document.addEventListener('pointermove', (e) => {
+            if (Engine.mainSubState.isDragging) {
+                const dx = e.clientX - mainDragStartX;
+                const dy = e.clientY - mainDragStartY;
+                const w = DOM.preview.clientWidth || 1;
+                const h = DOM.preview.clientHeight || 1;
+                
+                // 计算百分比并限制在画面内
+                Engine.mainSubState.x_pct = Math.max(0.05, Math.min(0.95, mainStartXPct + dx / w));
+                Engine.mainSubState.y_pct = Math.max(0.05, Math.min(0.95, mainStartYPct + dy / h));
+                
+                // 实时生效到预览框
+                DOM.subtitle.style.left = `${Engine.mainSubState.x_pct * 100}%`;
+                DOM.subtitle.style.top = `${Engine.mainSubState.y_pct * 100}%`;
+            }
+        });
+
+        document.addEventListener('pointerup', () => {
+            if (Engine.mainSubState.isDragging) {
+                Engine.mainSubState.isDragging = false;
+                DOM.subtitle.style.cursor = 'grab';
+            }
+        });
     </script>
 </body>
 </html>
