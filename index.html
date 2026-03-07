@@ -1453,24 +1453,22 @@
                     </div>
                 </div>
 
-                <div class="panel module-pane" data-module="scenes">
+<div class="panel module-pane" data-module="scenes">
                     <div class="module-pane-head">
                         <div class="module-pane-title">
                             <span>Scenes · 场景编排</span>
-                            <span id="sceneDurationSummary">总时长预估: 00:00</span>
+                            <!-- 将原来的 sceneDurationSummary 替换为 timelineTotal -->
+                            <span id="timelineTotal">总时长: 00:00</span>
                         </div>
                         <button onclick="addScene()" class="btn-green btn-compact">+ 新建场景</button>
                     </div>
-                    <div class="panel-hint">每个场景支持自动取素材或本地上传。时长填 0 时按配音/视频自动估算。</div>
+                    
+                    <!-- 提上来的精简版时间轴轨 -->
+                    <div id="timelineTrack" class="timeline-track" style="margin-top: -4px; margin-bottom: 2px;"></div>
+                    <div class="panel-hint">每个场景支持自动取素材或本地上传。填入秒数可强制时长；设为 0 则自动按配音估算。</div>
+                    
                     <div id="scenesContainer"></div>
-                    <div class="timeline-overview">
-                        <div class="timeline-head">
-                            <span>时间轴预览</span>
-                            <span id="timelineTotal">00:00</span>
-                        </div>
-                        <div id="timelineTrack" class="timeline-track"></div>
-                        <div class="timeline-tips">填入场景秒数可强制时长；设为 0 则自动按配音/视频时长。</div>
-                    </div>
+                    <!-- 底部的 timeline-overview 整个区块已被安全移除 -->
                 </div>
 
                 <div class="panel module-pane" data-module="text">
@@ -1751,7 +1749,6 @@
             fontColorHex: document.getElementById('fontColorHex'),
             fontColorPresetBar: document.getElementById('fontColorPresetBar'),
             subtitleStylePreset: document.getElementById('subtitleStylePreset'),
-            sceneDurationSummary: document.getElementById('sceneDurationSummary'),
             timelineTrack: document.getElementById('timelineTrack'),
             timelineTotal: document.getElementById('timelineTotal'),
             generateBtn: document.getElementById('generateBtn'),
@@ -1929,14 +1926,14 @@
             return { id, duration, isCustom };
         }
 
-        function renderTimelinePreview() {
-            if (!DOM.timelineTrack || !DOM.timelineTotal || !DOM.sceneDurationSummary) return;
+function renderTimelinePreview() {
+            // 移除了 sceneDurationSummary 的校验
+            if (!DOM.timelineTrack || !DOM.timelineTotal) return;
 
             const cards = [...document.querySelectorAll('.scene-card')];
             if (!cards.length) {
                 DOM.timelineTrack.innerHTML = '<div class="timeline-empty">暂无场景</div>';
-                DOM.timelineTotal.innerText = '00:00';
-                DOM.sceneDurationSummary.innerText = '总时长预估: 00:00';
+                DOM.timelineTotal.innerText = '总时长: 00:00';
                 updateSettingsOverview();
                 return;
             }
@@ -1960,8 +1957,8 @@
             });
 
             const totalLabel = formatDurationClock(total);
-            DOM.timelineTotal.innerText = totalLabel;
-            DOM.sceneDurationSummary.innerText = `总时长预估: ${totalLabel}`;
+            // 直接在这里显示带前缀的文字，合并功能
+            DOM.timelineTotal.innerText = `总时长: ${totalLabel}`;
             updateSettingsOverview();
         }
 
